@@ -13,11 +13,13 @@ steeper edges as impassable, so those areas drop out of the reachable set entire
 """
 
 import io
+import time
 from pathlib import Path
 
 import numpy as np
 import rasterio
 import requests
+from rasterio.transform import from_origin
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -26,27 +28,54 @@ SERVICE = ("https://elevation.nationalmap.gov/arcgis/rest/services/"
            "3DEPElevation/ImageServer/exportImage")
 TARGET_M = 15.0  # DEM sample spacing
 MAX_PX = 4000  # ImageServer per-request limit
+TILE_PX = 1800  # per-tile request size; the service 500s well below its nominal cap
 TOBLER_FLAT = np.exp(-3.5 * 0.05)  # Tobler's value at zero grade, for renormalising
 
 
-def fetch_dem(city_key: str, bounds: tuple, crs_epsg: int = 32610) -> tuple:
-    """Download a DEM covering `bounds` (in the given projected CRS). Returns (array, transform)."""
-    cache = DATA / f"dem_{city_key}.tif"
-    if not cache.exists():
-        minx, miny, maxx, maxy = bounds
-        pad = 500.0
-        minx, miny, maxx, maxy = minx - pad, miny - pad, maxx + pad, maxy + pad
-        w = min(int((maxx - minx) / TARGET_M), MAX_PX)
-        h = min(int((maxy - miny) / TARGET_M), MAX_PX)
+def _tile(minx, miny, maxx, maxy, w, h, crs_epsg, attempts=3):
+    for i in range(attempts):
         r = requests.get(SERVICE, params={
             "bbox": f"{minx},{miny},{maxx},{maxy}", "bboxSR": crs_epsg,
             "size": f"{w},{h}", "imageSR": crs_epsg, "format": "tiff",
             "pixelType": "F32", "interpolation": "RSP_BilinearInterpolation", "f": "image",
         }, timeout=600)
-        r.raise_for_status()
-        if not r.headers.get("content-type", "").startswith("image"):
-            raise RuntimeError(f"3DEP returned {r.headers.get('content-type')}: {r.text[:200]}")
-        cache.write_bytes(r.content)
+        if r.status_code == 200 and r.headers.get("content-type", "").startswith("image"):
+            with rasterio.open(io.BytesIO(r.content)) as ds:
+                return ds.read(1).astype(np.float64)
+        time.sleep(2 * (i + 1))
+    raise RuntimeError(f"3DEP tile failed after {attempts} attempts: HTTP {r.status_code}")
+
+
+def fetch_dem(city_key: str, bounds: tuple, crs_epsg: int = 32610) -> tuple:
+    """DEM covering `bounds` (projected CRS), always at TARGET_M resolution.
+
+    Requests are tiled. A single exportImage call for a large city exceeds the service's
+    pixel limit and 500s; clamping the size instead would silently coarsen the DEM for big
+    cities only, which would understate their steepness relative to small ones -- exactly
+    the cross-city comparison this is used for.
+    """
+    cache = DATA / f"dem_{city_key}.tif"
+    if not cache.exists():
+        pad = 500.0
+        minx, miny = bounds[0] - pad, bounds[1] - pad
+        maxx, maxy = bounds[2] + pad, bounds[3] + pad
+        W = int(np.ceil((maxx - minx) / TARGET_M))
+        H = int(np.ceil((maxy - miny) / TARGET_M))
+        out = np.full((H, W), np.nan, dtype=np.float64)
+        for r0 in range(0, H, TILE_PX):
+            for c0 in range(0, W, TILE_PX):
+                h = min(TILE_PX, H - r0)
+                w = min(TILE_PX, W - c0)
+                # rows count down from maxy: row 0 is the top of the image
+                tx0 = minx + c0 * TARGET_M
+                ty1 = maxy - r0 * TARGET_M
+                out[r0:r0 + h, c0:c0 + w] = _tile(
+                    tx0, ty1 - h * TARGET_M, tx0 + w * TARGET_M, ty1, w, h, crs_epsg)
+        transform = from_origin(minx, maxy, TARGET_M, TARGET_M)
+        with rasterio.open(cache, "w", driver="GTiff", height=H, width=W, count=1,
+                           dtype="float32", crs=f"EPSG:{crs_epsg}",
+                           transform=transform, compress="deflate") as ds:
+            ds.write(out.astype("float32"), 1)
     with rasterio.open(cache) as ds:
         return ds.read(1).astype(np.float64), ds.transform
 

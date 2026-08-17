@@ -55,7 +55,11 @@ class City:
     county: str
     pop_reference: int  # published city population, for validating the raster
     facility_source: str  # "arcgis" or "osm"
+    # Projected CRS in metres. Must match the city's UTM zone -- using Washington's
+    # zone 10N for Phoenix would distort every distance in the pipeline.
+    crs: str = "EPSG:32610"
     arcgis_service: str | None = None
+    arcgis_url: str | None = None
     osm_filter: dict = field(default_factory=dict)
 
 
@@ -66,6 +70,7 @@ CITIES = {
         state="53", county="033",  # King County
         pop_reference=755_000,
         facility_source="arcgis",
+        crs="EPSG:32610",  # UTM 10N
         arcgis_service="Seattle_Public_Library",
     ),
     "tacoma": City(
@@ -74,6 +79,7 @@ CITIES = {
         state="53", county="053",  # Pierce County
         pop_reference=222_000,
         facility_source="osm",
+        crs="EPSG:32610",  # UTM 10N
         # OSM tags amenity=library indiscriminately: the 12 features in Tacoma include
         # two university libraries and a prep-school one. The operator website is the
         # reliable discriminator -- the 8 that match are locations/1..8, which is
@@ -81,6 +87,18 @@ CITIES = {
         osm_filter={"tags": {"amenity": "library"}, "website_contains": "tacomalibrary.org"},
     ),
 }
+
+
+CITIES["phoenix"] = City(
+    key="phoenix",
+    place="Phoenix, Arizona, USA",
+    state="04", county="013",  # Maricopa County
+    pop_reference=1_650_000,
+    facility_source="arcgis_url",
+    crs="EPSG:32612",  # UTM 12N
+    arcgis_url=("https://maps.phoenix.gov/pub/rest/services/Public/Libraries/"
+                "MapServer/0/query"),
+)
 
 
 def get(key: str) -> City:

@@ -56,7 +56,7 @@ def _map(ax, s, values, title, cmap="magma_r", norm=None, vmax=None, unreachable
         ax.imshow(np.where(unreachable, 1.0, np.nan), origin="lower", extent=extent,
                   cmap=ListedColormap(["#00e5ff"]), vmin=0, vmax=1, alpha=0.95,
                   interpolation="nearest")
-    fac = gpd.read_file(DATA / f"{s['city'].key}_facilities.geojson").to_crs("EPSG:32610")
+    fac = gpd.read_file(DATA / f"{s['city'].key}_facilities.geojson").to_crs(s["city"].crs)
     ax.scatter(fac.geometry.x, fac.geometry.y, s=30, c="#00d4ff", marker="o",
                edgecolor="black", linewidth=0.7, zorder=4)
     ax.set_xticks([]); ax.set_yticks([])
@@ -238,7 +238,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
         ax.imshow(np.where(ov, 1.0, np.nan), origin="lower",
                   extent=[xs[0], xs[-1], ys[0], ys[-1]], cmap="autumn_r",
                   alpha=0.5, vmin=0, vmax=1.6, interpolation="nearest")
-        fac = gpd.read_file(DATA / f"{city.key}_facilities.geojson").to_crs("EPSG:32610")
+        fac = gpd.read_file(DATA / f"{city.key}_facilities.geojson").to_crs(city.crs)
         ax.scatter(fac.geometry.x, fac.geometry.y, s=34, c="#00d4ff", marker="o",
                    edgecolor="white", lw=0.8, zorder=4)
         for i, p in enumerate(pk[:5], 1):

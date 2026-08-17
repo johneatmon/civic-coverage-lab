@@ -4,7 +4,7 @@ Do persistent-homology coverage models change materially when you swap Euclidean
 for real walk-network distance — and does it matter once you weight by who actually lives
 there?
 
-Case study: Seattle public libraries (28 branches).
+Case studies: Seattle (28 branches), Tacoma (8), Phoenix (17).
 
 ## Phase 1 — the geometric gate
 
@@ -322,6 +322,71 @@ is a non-issue for you or it removes your route entirely — there is very littl
 **Reporting consequence:** the phrase "N residents have no route" was replaced throughout
 with the robust framing — the count, its threshold range, and what the cohort faces with no
 slope penalty at all. The PDF now states all three.
+
+
+## Phase 7 — Phoenix, and a prediction I got wrong
+
+Phoenix was added as the flat, gridded control: 17 branches, 1,002 km², 1.5 M residents.
+Adding it required making the projected CRS per-city (Phoenix is UTM 12N, not Washington's
+10N) and tiling the DEM requests, since a single call for a city that size exceeds the
+3DEP pixel limit — and silently clamping the size instead would have coarsened Phoenix's
+DEM alone, understating its steepness in exactly the comparison it was added to make.
+
+### The prediction
+
+Early in this project I claimed the network-vs-Euclidean effect was driven by *barriers*,
+that gridded cities approximate Euclidean distance well, and that "Phoenix would be a bad
+test case." That was wrong.
+
+| city | branches | km² | median detour ratio | steep segments |
+|---|---:|---:|---:|---:|
+| Seattle | 28 | 206 | **1.32** | 13.1% |
+| Tacoma | 8 | 116 | **1.35** | 6.4% |
+| Phoenix | 17 | 1,002 | **1.35** | 0.8% |
+
+Phoenix's detour ratio is *higher* than Seattle's, in a city with almost no terrain and a
+famously regular grid. The reason is simple in hindsight: a grid forces Manhattan travel,
+which averages ~1.27× Euclidean and reaches 1.41× on diagonals. Barriers add dramatic local
+detours in specific places, but the baseline penalty is structural to street networks
+themselves. **The metric finding does not depend on water barriers, and Seattle was not
+flattering it.**
+
+The percentage-point gap does compress in Phoenix (+5.2 pp against Seattle's +20.0 pp) —
+but only because Phoenix starts at 89.8% underserved by Euclidean distance, so there is
+little headroom. In absolute terms it still moves 77,700 people.
+
+### Phoenix is the outlier on everything else
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| adults beyond a 15-min walk | 57.6% | 80.0% | **95.0%** |
+| median walk | 21 min | 27 min | **55 min** |
+| residents per branch | 25.7k | 26.1k | **88.6k** |
+| car-free households underserved | 35.8% | 72.7% | 92.6% |
+| car-owning households underserved | 57.2% | 80.0% | 94.8% |
+
+Two things stand out. Phoenix has **3.4× the residents per branch** of either Washington
+city, and 5% of its population can reach a library on foot within 15 minutes. And the
+car-access inversion — car-free households being *better* served, which held strongly in
+Seattle (a 21-point advantage) and weakly in Tacoma (7 points) — nearly vanishes in Phoenix
+(2 points). That advantage comes from car-free households clustering in dense walkable
+cores. Phoenix does not have one.
+
+Slope is a non-issue there: 0.8% of segments exceed the ADA grade, and the entire
+threshold sweep moves the underserved figure by one point (98%–99%).
+
+### The siting benchmark, three for three
+
+| strategy | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| **MCLP greedy** | 100% | 100% | 100% |
+| random (mean of 5) | 38% | 36% | 25% |
+| PH by persistence | 27% | 7% | 12% |
+| PH by population | 14% | 17% | 7% |
+| worst-point (no topology) | 3% | 3% | 6% |
+
+Persistent homology loses to random placement in all three cities, on a flat grid as much
+as on a hilly peninsula.
 
 ## Method
 

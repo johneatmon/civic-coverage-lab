@@ -27,7 +27,7 @@ from ccl.graph import build_csr
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
-CRS_M = "EPSG:32610"
+CRS_M = "EPSG:32610"  # default only; each city carries its own UTM zone
 GRID_M = 150
 SNAP_MAX_M = 250.0
 MIN_DENSITY = 100.0
@@ -55,9 +55,11 @@ def fetch_facilities(city: City) -> gpd.GeoDataFrame:
     out = DATA / f"{city.key}_facilities.geojson"
     if out.exists():
         return gpd.read_file(out)
-    if city.facility_source == "arcgis":
+    if city.facility_source in ("arcgis", "arcgis_url"):
+        url = (city.arcgis_url if city.facility_source == "arcgis_url"
+               else f"{ARCGIS_ROOT}/{city.arcgis_service}/FeatureServer/0/query")
         r = requests.get(
-            f"{ARCGIS_ROOT}/{city.arcgis_service}/FeatureServer/0/query",
+            url,
             params={"where": "1=1", "outFields": "*", "outSR": "4326", "f": "geojson"},
             timeout=90,
         )
@@ -100,12 +102,12 @@ def walk_graph(city: City) -> nx.MultiDiGraph:
 
 
 def grid(city: City):
-    poly = boundary(city).to_crs(CRS_M).union_all()
+    poly = boundary(city).to_crs(city.crs).union_all()
     minx, miny, maxx, maxy = poly.bounds
     xs = np.arange(minx, maxx + GRID_M, GRID_M)
     ys = np.arange(miny, maxy + GRID_M, GRID_M)
     gx, gy = np.meshgrid(xs, ys)
-    pts = gpd.GeoSeries(gpd.points_from_xy(gx.ravel(), gy.ravel()), crs=CRS_M)
+    pts = gpd.GeoSeries(gpd.points_from_xy(gx.ravel(), gy.ravel()), crs=city.crs)
     return xs, ys, pts.within(poly).to_numpy().reshape(gx.shape)
 
 
@@ -151,18 +153,19 @@ def _geoms(city: City, geo: str) -> gpd.GeoDataFrame:
     kind = "bg" if geo == "block group" else "tract"
     g = _shp(f"https://www2.census.gov/geo/tiger/GENZ{ACS_YEAR}/shp/"
              f"cb_{ACS_YEAR}_{city.state}_{kind}_500k.zip", f"cb_{kind}_{city.state}")
-    return g[g["COUNTYFP"] == city.county].to_crs(CRS_M)
+    return g[g["COUNTYFP"] == city.county].to_crs(city.crs)
 
 
 def _water(city: City) -> gpd.GeoDataFrame:
     return _shp(f"https://www2.census.gov/geo/tiger/TIGER{ACS_YEAR}/AREAWATER/"
                 f"tl_{ACS_YEAR}_{city.state}{city.county}_areawater.zip",
-                f"areawater_{city.state}{city.county}").to_crs(CRS_M)
+                f"areawater_{city.state}{city.county}").to_crs(city.crs)
 
 
 def demand_rasters(city: City, xs, ys) -> dict:
     gx, gy = np.meshgrid(xs, ys)
-    cells = gpd.GeoDataFrame(geometry=gpd.points_from_xy(gx.ravel(), gy.ravel()), crs=CRS_M)
+    cells = gpd.GeoDataFrame(geometry=gpd.points_from_xy(gx.ravel(), gy.ravel()),
+                             crs=city.crs)
     cell_km2 = (GRID_M / 1000.0) ** 2
     out: dict[str, np.ndarray] = {}
 
@@ -201,8 +204,8 @@ def demand_rasters(city: City, xs, ys) -> dict:
 def build(city_key: str) -> dict:
     city = get(city_key)
     xs, ys, inside = grid(city)
-    fac = fetch_facilities(city).to_crs(CRS_M)
-    G = ox.project_graph(walk_graph(city), to_crs=CRS_M)
+    fac = fetch_facilities(city).to_crs(city.crs)
+    G = ox.project_graph(walk_graph(city), to_crs=city.crs)
 
     nodes = list(G.nodes)
     node_xy = np.array([[G.nodes[n]["x"], G.nodes[n]["y"]] for n in nodes])
@@ -226,7 +229,8 @@ def build(city_key: str) -> dict:
         np.column_stack([gx.ravel(), gy.ravel()]))[0].reshape(gx.shape)
 
     # Slope-aware travel time (seconds), one field per walker profile.
-    dem, transform = fetch_dem(city.key, tuple(boundary(city).to_crs(CRS_M).total_bounds))
+    dem, transform = fetch_dem(city.key, tuple(boundary(city).to_crs(city.crs).total_bounds),
+                               crs_epsg=int(city.crs.split(":")[1]))
     elev = sample(dem, transform, node_xy)
     elev = np.where(np.isnan(elev), np.nanmedian(elev), elev)
 
