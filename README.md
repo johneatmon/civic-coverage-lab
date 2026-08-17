@@ -75,19 +75,77 @@ demand variable, and it is not a cosmetic difference.
 | pockets | 12 | 17 | 33 | 42 | 54 | 76 |
 | people underserved | 627,255 | 554,279 | 479,551 | 402,550 | 248,561 | 134,686 |
 
-## A negative result worth keeping
+## Phase 3 — does topology beat MCLP? No.
 
-Persistent homology labels each pocket as topologically *enclosed* by coverage or merely
-hanging off the city edge. That distinction sounds valuable. In this dataset it is not:
+Two negative results, and they point the same way.
+
+### The enclosed/edge distinction carries no information
+
+PH labels each pocket as topologically *enclosed* by coverage or merely hanging off the
+city edge. That sounds valuable. Here it is not:
 
 - enclosed pockets: 9.11 – 55.37 km²
 - unenclosed pockets: 0.04 – 0.70 km²
 
-**No overlap.** "Enclosed" is perfectly predicted by pocket size, so PH is contributing
-nothing here beyond "this pocket is big" — which a distance buffer and a connected-
-component labelling would give you for a fraction of the compute. The open question the
-project still has to answer is whether PH beats a well-tuned maximal-covering (MCLP)
-baseline on any decision that matters. It has not been shown to yet.
+**No overlap.** "Enclosed" is perfectly predicted by pocket size — so a distance buffer
+plus connected-component labelling gives you the same partition for a fraction of the
+compute.
+
+### The siting benchmark
+
+The decision: *where should Seattle put the next 8 branches?* All strategies pick from the
+same 1,020-site candidate grid (450 m spacing), snapped by **network** distance, and are
+scored identically. `worst-point` is the control — place at the worst-served inhabited
+cell, recompute, repeat, no topology anywhere.
+
+People brought within the 1,200 m standard by 8 new branches:
+
+| strategy | newly covered | % of best |
+|---|---:|---:|
+| **MCLP greedy** | **+96,329** | 100% |
+| random (mean of 5) | +34,033 | 35% |
+| PH by population (adaptive) | +18,502 | 19% |
+| PH by persistence | +13,381 | 14% |
+| PH by population | +11,278 | 12% |
+| worst-point (no topology) | +2,479 | 3% |
+
+**Every PH variant loses to random placement.** The mechanism is not subtle: persistence
+points at the *most remote* location, and the most remote location is by definition where
+the fewest people live. Maximising distance is close to the opposite of maximising
+coverage.
+
+### Testing PH on an objective it should suit
+
+Scoring only on population covered is rigged — that is MCLP's own loss function. Coverage
+is max-sum and rewards density; worst-case walk distance is minimax and rewards reaching
+the isolated, which is what a hole detector points at. So PH should win there.
+
+It does not:
+
+| strategy | covered | car-free HH | worst walk | p95 walk |
+|---|---:|---:|---:|---:|
+| MCLP greedy | **+96,329** | **+8,632** | +0 m | −95 m |
+| worst-point (no topology) | +2,479 | +266 | **−6,001 m** | −115 m |
+| PH by persistence | +13,381 | +336 | −3,402 m | −254 m |
+| PH by population (adaptive) | +18,502 | +764 | +0 m | **−374 m** |
+| random (mean of 5) | +34,033 | +2,123 | +0 m | −173 m |
+
+PH wins exactly one column — population-weighted p95 walk — by a modest margin. On the
+minimax objective it was supposed to own, the trivial no-topology rule beats it by
+**1.8×**, which stands to reason: if the objective is to shrink the largest distance,
+placing at the largest-distance point is nearly optimal by construction.
+
+**For every objective tested there is a simpler tool that beats persistent homology.**
+
+### What this does not show
+
+The literature's claim for PH is detection, not siting: a barcode describes coverage
+across *all* scales at once, where MCLP and worst-point both need a service standard `S`
+and a budget `k` chosen up front. This benchmark holds `S` and `k` fixed, so it cannot
+speak to that. But for "tell me where the next branch goes," topology is the wrong engine.
+
+Notably MCLP does not improve worst-case walk *at all* (+0 m). MCLP and worst-point are
+complementary, and neither one needs topology.
 
 ## Method
 
@@ -122,6 +180,13 @@ succeeds and returns the right row count, entirely full of nulls — so a status
 passes and the data is silently zero. Those two now fall back to tract resolution, and
 `fetch_acs` raises if a column comes back all-null.
 
+**Snapping a recommendation by grid-index distance silently breaks the siting loop.**
+All strategies must place on a shared candidate grid, and the obvious snap is nearest
+cell in raster coordinates — but across a canal that neighbour is kilometres away on
+foot. The placed facility then fails to cover the point it was meant to serve, the same
+cell stays worst-served, and the strategy re-picks it forever (the control collapsed to
+2 distinct sites out of 8). Snapping now uses network distance and forbids repeats.
+
 **The obvious definition of a hole's extent swallows the city.** The void a class encloses
 is the component of `{d > birth}` containing the death cell — but at low birth values that
 superlevel set is still globally connected, so one hole's "region" measured 167 km² and
@@ -139,6 +204,9 @@ what it uniquely offers (enclosed vs. edge), not for extent.
   step.
 - Permanently-unfillable voids register as essential classes and are excluded from the
   finite bars, so hole counts are conservative.
+- The siting benchmark fixes `S`=1200 m and `k`=8 and uses greedy (not exact) MCLP.
+  Greedy is (1-1/e)-optimal for max-coverage, so an exact solve would only widen its
+  already decisive margin.
 
 ## Validation checks
 
@@ -156,6 +224,8 @@ uv run python src/ccl/persistence.py libraries
 PYTHONPATH=src uv run python -m ccl.rank libraries
 PYTHONPATH=src uv run python -m ccl.viz libraries
 PYTHONPATH=src uv run python -m ccl.viz_demand libraries
+PYTHONPATH=src uv run python -m ccl.mclp libraries        # siting benchmark
+PYTHONPATH=src uv run python -m ccl.objectives libraries  # multi-objective comparison
 ```
 
 Needs `CENSUS_DATA_API_KEY` in `.env` ([free signup](https://api.census.gov/data/key_signup.html)).
