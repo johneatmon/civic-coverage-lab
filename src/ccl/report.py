@@ -250,7 +250,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
 
         dens = np.where(d["habitable"] & (d["population_density"] > 0),
                         d["population_density"], np.nan)
-        ax = fig.add_axes([0.08, 0.36, 0.84, 0.51])
+        ax = fig.add_axes([0.08, 0.44, 0.84, 0.44])
         xs, ys = d["xs"], d["ys"]
         ax.imshow(dens, origin="lower", extent=[xs[0], xs[-1], ys[0], ys[-1]],
                   cmap="Greys", norm=LogNorm(vmin=200, vmax=np.nanmax(dens)),
@@ -277,17 +277,24 @@ def build_report(city_key: str, k: int = 8) -> Path:
             rows.append((str(i), f"{p['pop']:,.0f}", f"{p['nocar']:,.0f}",
                          f"{p['km2']:.1f} km²", f"{p['worst']:.0f} min",
                          f"{p['gain']:,.0f}"))
-        tax = fig.add_axes([0.08, 0.15, 0.84, 0.17]); tax.axis("off")
+        tax = fig.add_axes([0.08, 0.26, 0.84, 0.16]); tax.axis("off")
         tb = tax.table(cellText=rows[1:], colLabels=rows[0], loc="center",
                        cellLoc="right", colWidths=[0.09, 0.20, 0.19, 0.17, 0.18, 0.17])
         tb.auto_set_font_size(False); tb.set_fontsize(8.5); tb.scale(1, 1.6)
         for j in range(len(rows[0])):
             tb[0, j].set_facecolor("#eee"); tb[0, j].set_text_props(fontweight="bold")
-        _para(fig, 0.115,
+        _para(fig, 0.225,
               "Numbered markers are the best available branch site inside each pocket — "
               "the location that\nbrings the most residents within 15 minutes — chosen "
               "from habitable land only, so parks,\nport terminals and airfields are "
               "never proposed.")
+        _para(fig, 0.155, "These are not real parcels.", size=9.5, weight="bold")
+        _para(fig, 0.128,
+              "A marker means “somewhere around here would help most”, resolved to a "
+              "150 m grid. It carries no\nassessment of zoning, ownership, lot size, "
+              "acquisition cost, or whether anything is buildable on\nthe site. Treat "
+              "each one as a search area for a siting study, not a candidate address.",
+              size=9)
         _footer(fig, city, 5); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 6
