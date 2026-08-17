@@ -19,9 +19,20 @@ SNAP_MAX_M = 250.0  # cells further than this from the walk network are not walk
 MIN_PERSISTENCE_M = 300.0  # below ~2 grid cells the bars are discretisation noise
 
 
-def masked_field(field: np.ndarray, inside: np.ndarray, snap: np.ndarray) -> np.ndarray:
+def base_mask(d, extra: np.ndarray | None = None) -> np.ndarray:
+    """Cells that are inside the city, on the walk network, and reachable."""
+    keep = d["inside"] & (d["snap"] <= SNAP_MAX_M)
+    if extra is not None:
+        keep = keep & extra
+    return keep
+
+
+def masked_field(field: np.ndarray, inside: np.ndarray, snap: np.ndarray,
+                 extra: np.ndarray | None = None) -> np.ndarray:
     """Restrict the field to walkable land inside the city; elsewhere +inf."""
     keep = inside & (snap <= SNAP_MAX_M) & np.isfinite(field)
+    if extra is not None:
+        keep = keep & extra
     out = np.full(field.shape, np.inf)
     out[keep] = field[keep]
     return out
@@ -63,13 +74,13 @@ def to_xy(cells: np.ndarray, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
     return np.column_stack([xs[cells[:, 1]], ys[cells[:, 0]]])
 
 
-def analyse(resource: str) -> dict:
+def analyse(resource: str, extra: np.ndarray | None = None) -> dict:
     d = np.load(DATA / f"fields_{resource}.npz")
     xs, ys, inside, snap = d["xs"], d["ys"], d["inside"], d["snap"]
 
     result = {"xs": xs, "ys": ys}
     for metric in ("euclidean", "network"):
-        f = masked_field(d[metric], inside, snap)
+        f = masked_field(d[metric], inside, snap, extra)
         bars, cells = h1_diagram(f)
         result[metric] = {
             "field": f,

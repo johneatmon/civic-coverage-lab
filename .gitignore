@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 data/*.graphml
 data/*.npz
+.env
+data/cb_*/
+data/areawater_*/
