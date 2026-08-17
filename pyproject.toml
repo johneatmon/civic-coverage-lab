@@ -1,0 +1,18 @@
+[project]
+name = "civic-coverage-lab"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "geopandas>=1.1.4",
+    "gudhi>=3.13.0",
+    "matplotlib>=3.11.1",
+    "networkx>=3.6.1",
+    "numpy>=2.5.2",
+    "osmnx>=2.1.1",
+    "requests>=2.34.2",
+    "ripser>=0.6.15",
+    "scipy>=1.18.0",
+    "shapely>=2.1.2",
+]
