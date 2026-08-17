@@ -8,7 +8,7 @@ speed model, and for the mobility profile through ADA-impassable edges.
 import numpy as np
 
 from ccl.build import load
-from ccl.cities import PROFILES, TIME_BUDGETS_MIN, distance_m, get
+from ccl.cities import PAR_MAX_GRADE, PROFILES, TIME_BUDGETS_MIN, distance_m, get
 
 
 def flat_underserved(d, pop_field, threshold_m, metric="network"):
@@ -36,7 +36,7 @@ def summary(city_key: str) -> dict:
 
     mask = d["land"]
     out["population"] = float(d["population"][mask].sum())
-    out["grade_steep_pct"] = 100.0 * float((np.abs(d["edge_grade"]) > 0.0833).mean())
+    out["grade_steep_pct"] = 100.0 * float((np.abs(d["edge_grade"]) > PAR_MAX_GRADE).mean())
     out["elev_range"] = (float(np.nanmin(d["node_elev"])), float(np.nanmax(d["node_elev"])))
 
     rows = []
@@ -71,7 +71,7 @@ def report(city_key: str) -> None:
     d, city = s["d"], s["city"]
     print(f"\n{'=' * 92}\n{city.place.upper()} — {s['n_facilities']} library locations")
     print(f"elevation {s['elev_range'][0]:.0f}–{s['elev_range'][1]:.0f} m; "
-          f"{s['grade_steep_pct']:.1f}% of walk edges steeper than the ADA 8.33% limit")
+          f"{s['grade_steep_pct']:.1f}% of walk edges steeper than the 5% accessible-route grade")
     print("=" * 92)
 
     for m in TIME_BUDGETS_MIN:

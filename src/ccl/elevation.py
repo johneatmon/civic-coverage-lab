@@ -7,9 +7,10 @@ Speed model: Tobler's hiking function, renormalised so each profile's speed on f
 is its own published flat speed rather than Tobler's 1.4 m/s. Tobler peaks slightly
 downhill (-5% grade), which is the right shape for walking.
 
-For wheelchair users a speed penalty alone is the wrong model: above the ADA maximum
-running slope the route is not slow, it is unusable. Profiles carrying a `max_grade` treat
-steeper edges as impassable, so those areas drop out of the reachable set entirely.
+For wheelchair users a speed penalty alone is the wrong model: past the grade an accessible
+route is designed to (1:20 / 5%), a route is not merely slow. Profiles carrying a
+`max_grade` treat steeper edges as impassable, so those areas drop out of the reachable
+set entirely.
 """
 
 import io

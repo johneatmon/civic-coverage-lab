@@ -112,7 +112,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
               f"{d['land'].sum() * 0.0225:,.0f} km² analysed · "
               f"{S['population']:,.0f} residents\n"
               f"Terrain  elevation {S['elev_range'][0]:.0f}–{S['elev_range'][1]:.0f} m · "
-              f"{S['grade_steep_pct']:.1f}% of walk segments steeper than 8.33%\n"
+              f"{S['grade_steep_pct']:.1f}% of walk segments steeper than the 5% accessible-route grade\n"
               f"Standard 15-minute neighbourhood goal; 3 mph on the flat = 0.75 mi\n"
               f"Sources  OpenStreetMap walk network · US Census ACS 5-year 2023 · "
               f"USGS 3DEP elevation", size=10)
@@ -181,30 +181,30 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- page 4
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Slope, and who it excludes",
-               "Grade excludes people that distance alone does not, and the effect "
-               "is concentrated")
+               "Measured against the 1:20 (5%) grade an accessible route is designed to")
         tm = d["time_mobility"] / 60.0
         unreach = d["land"] & ~np.isfinite(d["time_mobility"])
         ax = fig.add_axes([0.08, 0.34, 0.84, 0.53])
         im = _map(ax, s, tm, "", cmap="magma_r", vmax=60, unreachable=unreach)
         cb = fig.colorbar(im, ax=ax, shrink=0.62, pad=0.02)
-        cb.set_label("minutes at 0.80 m/s, ADA-compliant routes only", fontsize=9)
+        cb.set_label("minutes at 0.80 m/s, routes at or under a 5% grade", fontsize=9)
         mob = S["profiles"][2][15]
         st = stranded_profile(city_key)
         _para(fig, 0.285,
-              f"Cyan marks land with no ADA-compliant walking route to any library: "
-              f"{st['count']:,.0f} residents with an\nambulatory difficulty, "
+              f"Cyan marks land with no route to any library that stays within a 5% "
+              f"grade: {st['count']:,.0f} residents\nwith an ambulatory difficulty, "
               f"{100 * st['count'] / mob['total']:.0f}% of that group. "
-              f"{S['grade_steep_pct']:.1f}% of walk segments exceed the 8.33% limit.\n\n"
+              f"{S['grade_steep_pct']:.1f}% of walk segments are steeper than that.\n\n"
               f"That count is sensitive to the threshold — it ranges "
-              f"{st['range'][0]:,.0f}–{st['range'][1]:,.0f} between a 1:20 and a 1:8 "
-              f"cutoff — so it\nshould not be read as a precise figure. The finding "
-              f"underneath it is not sensitive. These are\nremote locations before slope "
-              f"is considered at all: with no slope penalty whatsoever the same\n"
-              f"cohort still faces a median {st['median_min_no_penalty']:.0f}-minute walk, "
-              f"and {st['pct_over_60_no_penalty']:.0f}% of them over an hour. Slope is a "
-              f"second\neffect on top of an already severe access deficit, and it falls "
-              f"almost wholly on wheelchair users.")
+              f"{st['range'][0]:,.0f}–{st['range'][1]:,.0f} across cutoffs from 4% to "
+              f"15% — so it\nshould not be read as a precise figure. Two things "
+              f"underneath it are not sensitive.\n\n"
+              f"These are remote places before grade is considered at all: with no "
+              f"slope penalty\nwhatsoever the same cohort still faces a median "
+              f"{st['median_min_no_penalty']:.0f}-minute walk, and "
+              f"{st['pct_over_60_no_penalty']:.0f}% over an hour.\nAnd the burden falls "
+              f"almost entirely on this profile — grade moves the adult\nfigure about "
+              f"two points, against {mob['pct'] - mob['flat_pct']:.0f} points here.")
         _footer(fig, city, 4); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 5
@@ -328,7 +328,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
               "Walk network from OpenStreetMap, retaining all connected components. "
               "Travel time uses Tobler's\nhiking function renormalised to each profile's "
               "flat speed; the mobility profile additionally treats\nsegments steeper "
-              "than 8.33% as impassable. Population is ACS 2023 block-group data "
+              "than 5% as impassable. Population is ACS 2023 block-group data "
               "rasterised to\na 150 m grid; poverty, vehicle access and ambulatory "
               "difficulty are tract-level and therefore coarser.\n\n"
               "Known limits: sidewalk quality, curb ramps, crossing delay and transit are "

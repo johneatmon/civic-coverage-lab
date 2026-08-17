@@ -353,7 +353,7 @@ if __name__ == "__main__":
               f"max {n[np.isfinite(n)].max():,.0f} m")
         print(f"  elevation         : {np.nanmin(r['node_elev']):.0f}-"
               f"{np.nanmax(r['node_elev']):.0f} m; "
-              f"|grade|>8.33% on {100 * (np.abs(r['edge_grade']) > 0.0833).mean():.1f}% of edges")
+              f"|grade|>5% on {100 * (np.abs(r['edge_grade']) > 0.05).mean():.1f}% of edges")
         for p in PROFILES:
             tf = r[f"time_{p.key}"][inh] / 60.0
             ok = np.isfinite(tf)

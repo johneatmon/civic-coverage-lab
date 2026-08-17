@@ -1,8 +1,11 @@
-"""How much does the ADA-impassability finding depend on the 8.33% cutoff?
+"""How much does the grade-exclusion finding depend on the 5% cutoff?
 
 Two separate questions, and they are not equally important:
 
-1. Threshold — does the stranded population move a lot between 1:20 and 1:8?
+1. Threshold — does the stranded population move a lot across the plausible range? Each
+   grade below has a real meaning: 1:20 is the accessible-route/PAR limit, 1:12 is the
+   maximum for a ramp or curb ramp, and the steeper rows approximate what PROWAG's
+   adjacent-street exception effectively permits on a hillside sidewalk.
 2. Model form — treating a steep segment as *impassable* is a modelling choice. Real
    routes have switchbacks, and street centreline grade is not sidewalk grade. Under a
    soft penalty nobody is stranded; they just face a longer trip. The question that
@@ -20,9 +23,11 @@ from ccl.cities import PROFILES, get
 from ccl.elevation import speed
 
 MOBILITY = PROFILES[2]
-GRADES = [0.05, 0.0625, 0.0833, 0.10, 0.125, 0.15, None]
-GRADE_LABEL = {0.05: "1:20 (5.0%)", 0.0625: "1:16 (6.3%)", 0.0833: "1:12 (8.3%) ADA",
-               0.10: "1:10 (10.0%)", 0.125: "1:8 (12.5%)", 0.15: "15.0%", None: "no cutoff"}
+GRADES = [0.04, 0.05, 0.0625, 0.0833, 0.10, 0.125, 0.15, None]
+GRADE_LABEL = {0.04: "4.0%", 0.05: "1:20 (5%) route", 0.0625: "1:16 (6.3%)",
+               0.0833: "1:12 (8.3%) ramp", 0.10: "1:10 (10%)", 0.125: "1:8 (12.5%)",
+               0.15: "15% (street grade)", None: "no cutoff"}
+HEADLINE = 0.05
 PENALTIES = [1, 2, 5, 10, 25, np.inf]
 
 
@@ -66,17 +71,17 @@ def analyse(city_key: str) -> None:
         nor = float(pop[land & ~np.isfinite(f)].sum())
         b15 = float(pop[land & ~(f <= 900)].sum())
         b30 = float(pop[land & ~(f <= 1800)].sum())
-        if g == 0.0833:
+        if g == HEADLINE:
             base_stranded = land & ~np.isfinite(f)
         print(f"{GRADE_LABEL[g]:>16s}{blocked:>14.1f}%{nor:>10,.0f}"
               f"{100 * nor / total:>5.0f}%{b15:>11,.0f}{100 * b15 / total:>5.0f}%"
               f"{b30:>11,.0f}{100 * b30 / total:>5.0f}%")
 
-    print("\n2. MODEL FORM at the ADA 8.33% threshold")
+    print("\n2. MODEL FORM at the 5% accessible-route grade")
     print("   (cost multiplier on above-grade segments; inf = the hard cutoff)")
     print(f"{'penalty':>16s}{'no route':>14s}{'beyond 15 min':>16s}{'beyond 30 min':>16s}")
     for p in PENALTIES:
-        f = time_field(d, csr, coo, MOBILITY.speed_mps, 0.0833, p)
+        f = time_field(d, csr, coo, MOBILITY.speed_mps, HEADLINE, p)
         nor = float(pop[land & ~np.isfinite(f)].sum())
         b15 = float(pop[land & ~(f <= 900)].sum())
         b30 = float(pop[land & ~(f <= 1800)].sum())
@@ -92,7 +97,7 @@ def analyse(city_key: str) -> None:
     print(f"   cohort: {n_stranded:,.0f} people ({100 * n_stranded / total:.0f}% of group)")
     print(f"\n{'penalty':>16s}{'median':>10s}{'p90':>9s}{'max':>9s}{'still >60 min':>15s}")
     for p in [1, 2, 5, 10, 25]:
-        f = time_field(d, csr, coo, MOBILITY.speed_mps, 0.0833, p)
+        f = time_field(d, csr, coo, MOBILITY.speed_mps, HEADLINE, p)
         v = f[base_stranded] / 60.0
         ok = np.isfinite(v)
         w = pop[base_stranded][ok]
@@ -100,14 +105,14 @@ def analyse(city_key: str) -> None:
         print(f"{f'{p}x':>16s}{np.median(v[ok]):>9.0f}m{np.percentile(v[ok], 90):>8.0f}m"
               f"{v[ok].max():>8.0f}m{100 * over / n_stranded:>14.0f}%")
 
-    # Detour cost: how much longer is the ADA-compliant route than the unconstrained one?
+    # Detour cost: how much longer is the low-grade route than the unconstrained one?
     f_free = time_field(d, csr, coo, MOBILITY.speed_mps, None)
-    f_ada = time_field(d, csr, coo, MOBILITY.speed_mps, 0.0833)
+    f_ada = time_field(d, csr, coo, MOBILITY.speed_mps, HEADLINE)
     both = land & np.isfinite(f_free) & np.isfinite(f_ada)
     ratio = f_ada[both] / np.maximum(f_free[both], 1)
     w = pop[both]
-    print(f"\n4. DETOUR COST for those who DO keep a compliant route")
-    print(f"   population-weighted median ratio (ADA route / unconstrained): "
+    print(f"\n4. DETOUR COST for those who DO keep a low-grade route")
+    print(f"   population-weighted median ratio (<=5% route / unconstrained): "
           f"{np.median(np.repeat(ratio, np.maximum(w.astype(int), 0)) if w.sum() > 0 else ratio):.2f}x")
     print(f"   share of that population facing >1.5x: "
           f"{100 * float(w[ratio > 1.5].sum()) / float(w.sum()):.0f}%")
@@ -128,12 +133,12 @@ def stranded_profile(city_key: str) -> dict:
     coo = csr.tocoo()
     pop, land = d["pop_ambulatory"], d["land"]
 
-    f_ada = time_field(d, csr, coo, MOBILITY.speed_mps, 0.0833)
+    f_ada = time_field(d, csr, coo, MOBILITY.speed_mps, HEADLINE)
     stranded = land & ~np.isfinite(f_ada)
     count = float(pop[stranded].sum())
 
     counts = []
-    for g in (0.05, 0.0625, 0.0833, 0.10, 0.125, 0.15):
+    for g in (0.04, 0.05, 0.0625, 0.0833, 0.10, 0.125, 0.15):
         f = time_field(d, csr, coo, MOBILITY.speed_mps, g)
         counts.append(float(pop[land & ~np.isfinite(f)].sum()))
 

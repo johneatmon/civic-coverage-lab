@@ -442,6 +442,50 @@ city, so it distorted *where* the tool pointed without distorting *how many* it 
 The maps and every siting recommendation changed materially; the headline percentages did
 not.
 
+
+## Phase 9 — the grade threshold was wrong
+
+Review caught a substantive error. **8.33% (1:12) is the maximum running slope for a
+*ramp*, not a general limit for a pedestrian route.** Under the 2010 ADA Standards an
+accessible route's walking surface is limited to **1:20 (5%)**; anything steeper *is* a
+ramp and picks up handrails, landings, edge protection and rise limits. PROWAG R302.4.1
+sets the same 5% ceiling on a pedestrian access route in the right-of-way. 1:12 appears in
+PROWAG only for **curb ramps** (R304.2.1). Cross slope is capped at 1:48 (2.1%) — a real
+constraint this does not model at all, since sidewalk cross slope is not derivable from a
+street-centreline DEM.
+
+PROWAG grants one important exception: where the adjacent street exceeds 5%, the route may
+match the street's grade. So a sidewalk up a steep hill can be entirely compliant — which
+is why the phrase "no ADA-compliant route" was wrong on its own terms and has been dropped
+throughout. **5% is the grade an accessible route is designed to, not a promise that
+steeper is unlawful.** The tool now reports "no route within a 5% grade".
+
+### What changed
+
+| at the 15-minute standard | 8.33% (wrong) | **5% (correct)** |
+|---|---:|---:|
+| Seattle, walk segments over threshold | 13.1% | **24.5%** |
+| Seattle, ambulatory difficulty underserved | 86.8% | **92.5%** |
+| Seattle, no route within grade | 4,481 (16%) | **12,736 (46%)** |
+| Tacoma, no route within grade | 683 (5%) | **3,391 (24%)** |
+| Phoenix, no route within grade | 325 (0.4%) | **1,063 (1.3%)** |
+
+The excluded population roughly **triples**. Two earlier conclusions have to be withdrawn:
+
+- **"Slope is a second-order effect."** False at 5%. Grade moves the ambulatory-difficulty
+  figure from 80.2% to 92.5% — 12 points — while still moving the adult figure only ~2.
+  It is a first-order effect for the profile it applies to.
+- **"The effect is bimodal — either grade is a non-issue or it removes your route."** The
+  detour cost for those who keep a within-grade route was 1.07× at 8.33%; at 5% it is
+  **1.36×**. There is a substantial middle after all.
+
+### What survives
+
+The robustness argument holds. The count is still threshold-sensitive (966–18,925 across
+4%–15% cutoffs) and should never be quoted alone. And the cohort it identifies is still
+genuinely remote before grade enters: with *no* slope penalty at all they face a median
+41-minute walk in Seattle, 62 in Tacoma, 145 in Phoenix.
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.

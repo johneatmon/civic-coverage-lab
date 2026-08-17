@@ -24,10 +24,22 @@ class Profile:
     max_grade: float | None = None  # steeper edges are impassable, not merely slow
 
 
-# ADA maximum running slope for a ramp is 1:12 = 8.33%. Above that a route is not slow
-# for a manual wheelchair user, it is unusable -- so the mobility profile drops those
-# edges rather than penalising them.
-ADA_MAX_GRADE = 0.0833
+# Accessible-route grade. Under the 2010 ADA Standards a walking surface on an accessible
+# route is limited to 1:20 (5%); anything steeper is a *ramp*, which additionally requires
+# handrails, landings, edge protection and rise limits. PROWAG R302.4.1 sets the same 5%
+# limit on a pedestrian access route in the right-of-way.
+#
+# 1:12 (8.3%) is the maximum for a *ramp* (ADA) or a *curb ramp* (PROWAG R304.2.1) -- not a
+# general limit for walking a city block, which is what this models.
+#
+# PROWAG grants an exception: where the adjacent street exceeds 5%, the route may match the
+# street's grade. So a sidewalk up a steep hill can be fully compliant. 5% is therefore the
+# grade an accessible route is *designed* to, not a guarantee that steeper is unlawful --
+# which is exactly why it is the right usability threshold and why the label below avoids
+# the word "compliant".
+PAR_MAX_GRADE = 0.05
+ADA_RAMP_MAX_GRADE = 0.0833  # ramps and curb ramps only
+ADA_MAX_CROSS_SLOPE = 0.021  # 1:48; not modelled -- no sidewalk cross-slope data
 
 PROFILES = [
     Profile("adult", "Adult (planning standard)", 1.34,
@@ -36,8 +48,8 @@ PROFILES = [
             "gait-speed literature; MUTCD uses 1.07 m/s where older pedestrians are present",
             "pop_65plus"),
     Profile("mobility", "Ambulatory difficulty", 0.80,
-            "manual wheelchair / walking-aid speeds; ADA 1:12 max running slope",
-            "pop_ambulatory", ADA_MAX_GRADE),
+            "manual wheelchair / walking-aid speeds; 1:20 accessible-route grade",
+            "pop_ambulatory", PAR_MAX_GRADE),
 ]
 
 TIME_BUDGETS_MIN = [10, 15]
