@@ -21,7 +21,13 @@ class Profile:
     speed_mps: float
     basis: str
     pop_field: str  # which demand raster counts as this profile's population
+    max_grade: float | None = None  # steeper edges are impassable, not merely slow
 
+
+# ADA maximum running slope for a ramp is 1:12 = 8.33%. Above that a route is not slow
+# for a manual wheelchair user, it is unusable -- so the mobility profile drops those
+# edges rather than penalising them.
+ADA_MAX_GRADE = 0.0833
 
 PROFILES = [
     Profile("adult", "Adult (planning standard)", 1.34,
@@ -30,7 +36,8 @@ PROFILES = [
             "gait-speed literature; MUTCD uses 1.07 m/s where older pedestrians are present",
             "pop_65plus"),
     Profile("mobility", "Ambulatory difficulty", 0.80,
-            "manual wheelchair / walking-aid speeds", "pop_ambulatory"),
+            "manual wheelchair / walking-aid speeds; ADA 1:12 max running slope",
+            "pop_ambulatory", ADA_MAX_GRADE),
 ]
 
 TIME_BUDGETS_MIN = [10, 15]

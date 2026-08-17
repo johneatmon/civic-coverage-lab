@@ -11,7 +11,8 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
 from ccl.build import load
-from ccl.cities import PROFILES, distance_m, get
+from ccl.cities import PROFILES, get
+from ccl.elevation import edge_seconds
 from ccl.persistence import h1_diagram
 
 STRIDE = 3
@@ -26,17 +27,26 @@ def setup(city_key: str, stride: int = STRIDE) -> dict:
     cand[::stride, ::stride] = True
     cand &= d["inhabited"]
     rc = np.argwhere(cand)
+    # Rebuild the adult travel-time matrix. edge_grade was stored in the COO ordering of
+    # this same CSR, so the two line up element-for-element.
+    adult = PROFILES[0]
+    coo = csr.tocoo()
+    secs = edge_seconds(coo.data, d["edge_grade"], adult.speed_mps, adult.max_grade)
+    keep = np.isfinite(secs)
+    tcsr = csr_matrix((secs[keep], (coo.row[keep], coo.col[keep])), shape=csr.shape)
     return {
-        "d": d, "csr": csr, "cand_rc": rc,
+        "d": d, "csr": csr, "tcsr": tcsr.T.tocsr(), "cand_rc": rc,
         "cand_nodes": np.array([d["cell_node"][r, c] for r, c in rc], dtype=np.int64),
         "city": get(city_key),
     }
 
 
 def field_from(s: dict, nodes) -> np.ndarray:
+    """Adult travel time in seconds, person -> nearest facility (graph already transposed)."""
     d = s["d"]
-    f = dijkstra(s["csr"], indices=np.unique(nodes), min_only=True)[d["cell_node"]] + d["snap"]
-    return np.where(d["land"], f, np.inf)
+    adult = PROFILES[0]
+    t = dijkstra(s["tcsr"], indices=np.unique(nodes), min_only=True)[d["cell_node"]]
+    return np.where(d["land"], t + d["snap"] / adult.speed_mps, np.inf)
 
 
 def masked(s: dict, f: np.ndarray) -> np.ndarray:
@@ -46,7 +56,7 @@ def masked(s: dict, f: np.ndarray) -> np.ndarray:
 def snap_candidate(s: dict, rc, exclude: set) -> int:
     """Snap to the candidate grid by NETWORK distance -- raster adjacency can be
     kilometres away on foot across a canal, which strands the strategy on one cell."""
-    dn = dijkstra(s["csr"], indices=[int(s["d"]["cell_node"][rc[0], rc[1]])], min_only=True)
+    dn = dijkstra(s["csr"], indices=[int(s["d"]["cell_node"][rc[0], rc[1]])], min_only=True)  # noqa: E501
     dc = dn[s["cand_nodes"]].copy()
     if exclude:
         dc[list(exclude)] = np.inf
@@ -64,9 +74,9 @@ def coverage_matrix(s: dict, standard: float, batch: int = 120) -> np.ndarray:
     out = np.zeros((n, d["cell_node"].size), dtype=bool)
     for i in range(0, n, batch):
         chunk = s["cand_nodes"][i:i + batch]
-        dn = dijkstra(s["csr"], indices=chunk, limit=standard, min_only=False)
+        dn = dijkstra(s["tcsr"].T.tocsr(), indices=chunk, limit=standard, min_only=False)
         for j in range(len(chunk)):
-            f = dn[j][d["cell_node"]] + d["snap"]
+            f = dn[j][d["cell_node"]] + d["snap"] / PROFILES[0].speed_mps
             out[i + j] = ((f <= standard) & d["land"]).ravel()
     return out
 
@@ -164,9 +174,8 @@ def score(s: dict, picks: list, standard: float) -> dict:
     }
 
 
-def run(city_key: str, k: int = 8, minutes: int = 15) -> None:
-    adult = next(p for p in PROFILES if p.key == "adult")
-    standard = distance_m(adult, minutes)
+def results(city_key: str, k: int = 8, minutes: int = 15) -> dict:
+    standard = minutes * 60.0
     s = setup(city_key)
     cov = coverage_matrix(s, standard)
 
@@ -180,10 +189,16 @@ def run(city_key: str, k: int = 8, minutes: int = 15) -> None:
     rows = {n: score(s, p, standard) for n, p in strategies.items()}
     rnd = [score(s, random_picks(s, k, sd), standard) for sd in range(5)]
     rows["random (mean of 5)"] = {kk: float(np.mean([r[kk] for r in rnd])) for kk in base}
+    return {"s": s, "base": base, "rows": rows, "picks": strategies,
+            "standard": standard, "minutes": minutes, "k": k}
 
+
+def run(city_key: str, k: int = 8, minutes: int = 15) -> dict:
+    R = results(city_key, k, minutes)
+    s, base, rows, standard = R["s"], R["base"], R["rows"], R["standard"]
     print(f"\n{'=' * 90}")
     print(f"{s['city'].place.upper()} — siting {k} new branches, "
-          f"{minutes} min adult standard ({standard:,.0f} m)")
+          f"{minutes} min adult standard (slope-aware travel time)")
     print(f"existing: {len(s['d']['fac_nodes'])} branches · "
           f"candidates: {len(s['cand_nodes'])} sites")
     print(f"{'=' * 90}")
@@ -194,7 +209,8 @@ def run(city_key: str, k: int = 8, minutes: int = 15) -> None:
         print(f"{n:30s}{r['covered'] - base['covered']:>+12,.0f}"
               f"{r['nocar_hh'] - base['nocar_hh']:>+14,.0f}"
               f"{r['older'] - base['older']:>+11,.0f}"
-              f"{r['worst'] - base['worst']:>+12,.0f}m{r['p95'] - base['p95']:>+9,.0f}m")
+              f"{(r['worst'] - base['worst']) / 60:>+11,.1f}m"
+              f"{(r['p95'] - base['p95']) / 60:>+8,.1f}m")
     best = max(rows.items(), key=lambda kv: kv[1]["covered"])
     print(f"\nbaseline covered: {base['covered']:,.0f} of "
           f"{s['d']['population'][s['d']['inhabited']].sum():,.0f} "
@@ -204,6 +220,7 @@ def run(city_key: str, k: int = 8, minutes: int = 15) -> None:
         g = r["covered"] - base["covered"]
         bg = best[1]["covered"] - base["covered"]
         print(f"  {n:30s} +{g:>8,.0f}  ({100 * g / bg:5.1f}% of best)")
+    return R
 
 
 if __name__ == "__main__":

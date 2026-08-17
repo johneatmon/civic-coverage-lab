@@ -1,9 +1,8 @@
-"""Underserved population by walking-speed profile, time budget, and car access.
+"""Underserved population by walker profile, time budget, car access — and slope effect.
 
-A time-based service standard ("everyone within a 10 minute walk") is not one distance.
-It is a different distance for every kind of walker, and each of those distances applies
-to a different population. This resolves the policy sentence into the numbers it actually
-implies.
+Now measured in actual travel time rather than a distance proxy, which is what a
+"15 minute neighbourhood" policy literally says. Slope enters through the per-profile
+speed model, and for the mobility profile through ADA-impassable edges.
 """
 
 import numpy as np
@@ -12,67 +11,86 @@ from ccl.build import load
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, distance_m, get
 
 
-def underserved(d: dict, metric: str, pop_field: str, threshold: float) -> tuple[float, float]:
-    """(people/households beyond the threshold, total in the analysed area)."""
+def flat_underserved(d, pop_field, threshold_m, metric="network"):
+    """Old distance-based measure: flat metres, no slope."""
     mask = d["land"] & np.isfinite(d[metric])
-    total = float(d[pop_field][mask].sum())
-    beyond = float(d[pop_field][mask & (d[metric] > threshold)].sum())
-    return beyond, total
+    tot = float(d[pop_field][mask].sum())
+    return float(d[pop_field][mask & (d[metric] > threshold_m)].sum()), tot
+
+
+def time_underserved(d, profile, minutes):
+    """Slope-aware: beyond the time budget, or with no usable route at all."""
+    f = d[f"time_{profile.key}"]
+    mask = d["land"]
+    tot = float(d[profile.pop_field][mask].sum())
+    beyond = mask & ~(f <= minutes * 60.0)  # NaN/inf-safe: unreachable counts as beyond
+    unreachable = mask & ~np.isfinite(f)
+    return (float(d[profile.pop_field][beyond].sum()), tot,
+            float(d[profile.pop_field][unreachable].sum()))
+
+
+def summary(city_key: str) -> dict:
+    """All the numbers the report needs, in one pass."""
+    city, d = get(city_key), load(city_key)
+    out = {"city": city, "d": d, "n_facilities": int(d["fac_nodes"].size)}
+
+    mask = d["land"]
+    out["population"] = float(d["population"][mask].sum())
+    out["grade_steep_pct"] = 100.0 * float((np.abs(d["edge_grade"]) > 0.0833).mean())
+    out["elev_range"] = (float(np.nanmin(d["node_elev"])), float(np.nanmax(d["node_elev"])))
+
+    rows = []
+    for p in PROFILES:
+        r = {"profile": p}
+        for m in TIME_BUDGETS_MIN:
+            b, t, u = time_underserved(d, p, m)
+            fb, ft = flat_underserved(d, p.pop_field, distance_m(p, m))
+            r[m] = {"beyond": b, "total": t, "unreachable": u, "pct": 100 * b / t,
+                    "flat_beyond": fb, "flat_pct": 100 * fb / ft,
+                    "slope_cost": b - fb}
+        rows.append(r)
+    out["profiles"] = rows
+
+    # Car access at the 15-minute adult standard, slope-aware.
+    adult = PROFILES[0]
+    f = d[f"time_{adult.key}"]
+    beyond = mask & ~(f <= 15 * 60.0)
+    tot_all, tot_no = float(d["households"][mask].sum()), float(d["no_vehicle_hh"][mask].sum())
+    b_all, b_no = float(d["households"][beyond].sum()), float(d["no_vehicle_hh"][beyond].sum())
+    out["car"] = {
+        "no_vehicle": (tot_no, b_no, 100 * b_no / tot_no),
+        "has_vehicle": (tot_all - tot_no, b_all - b_no,
+                        100 * (b_all - b_no) / (tot_all - tot_no)),
+        "all": (tot_all, b_all, 100 * b_all / tot_all),
+    }
+    return out
 
 
 def report(city_key: str) -> None:
-    city = get(city_key)
-    d = load(city_key)
-
-    print(f"\n{'=' * 84}")
-    print(f"{city.place.upper()} — {int(d['fac_nodes'].size)} library locations")
-    print(f"{'=' * 84}")
-
-    print("\nA time standard is not one distance:\n")
-    print(f"{'profile':30s}{'speed':>10s}" +
-          "".join(f"{f'{m} min':>12s}" for m in TIME_BUDGETS_MIN))
-    for p in PROFILES:
-        print(f"{p.label:30s}{p.speed_mps:>8.2f}m/s" +
-              "".join(f"{distance_m(p, m):>10,.0f} m" for m in TIME_BUDGETS_MIN))
-
-    for metric in ("network", "euclidean"):
-        print(f"\n{'-' * 84}\nUnderserved by profile — {metric} distance\n{'-' * 84}")
-        print(f"{'profile':30s}{'relevant pop':>14s}" +
-              "".join(f"{f'beyond {m} min':>20s}" for m in TIME_BUDGETS_MIN))
-        for p in PROFILES:
-            cells = []
-            total = 0.0
-            for m in TIME_BUDGETS_MIN:
-                b, total = underserved(d, metric, p.pop_field, distance_m(p, m))
-                cells.append(f"{b:>11,.0f} ({100 * b / total:4.1f}%)")
-            print(f"{p.label:30s}{total:>14,.0f}" + "".join(f"{c:>20s}" for c in cells))
-
-    # Car access. Walking distance binds hardest on households without a car; everyone
-    # else has an alternative. Reported as households, which is how ACS measures it.
-    adult = next(p for p in PROFILES if p.key == "adult")
-    print(f"\n{'-' * 84}\nCar access, at the 15-minute adult standard "
-          f"({distance_m(adult, 15):,.0f} m) — network distance\n{'-' * 84}")
-    thr = distance_m(adult, 15)
-    mask = d["land"] & np.isfinite(d["network"])
-    beyond = mask & (d["network"] > thr)
-    hh_all, hh_no = d["households"], d["no_vehicle_hh"]
-    tot_all, tot_no = float(hh_all[mask].sum()), float(hh_no[mask].sum())
-    b_all, b_no = float(hh_all[beyond].sum()), float(hh_no[beyond].sum())
-    tot_car, b_car = tot_all - tot_no, b_all - b_no
-    print(f"{'households':30s}{'total':>14s}{'beyond standard':>20s}{'rate':>10s}")
-    print(f"{'no vehicle available':30s}{tot_no:>14,.0f}{b_no:>20,.0f}"
-          f"{100 * b_no / tot_no:>9.1f}%")
-    print(f"{'has a vehicle':30s}{tot_car:>14,.0f}{b_car:>20,.0f}"
-          f"{100 * b_car / tot_car:>9.1f}%")
-    print(f"{'all households':30s}{tot_all:>14,.0f}{b_all:>20,.0f}"
-          f"{100 * b_all / tot_all:>9.1f}%")
+    s = summary(city_key)
+    d, city = s["d"], s["city"]
+    print(f"\n{'=' * 92}\n{city.place.upper()} — {s['n_facilities']} library locations")
+    print(f"elevation {s['elev_range'][0]:.0f}–{s['elev_range'][1]:.0f} m; "
+          f"{s['grade_steep_pct']:.1f}% of walk edges steeper than the ADA 8.33% limit")
+    print("=" * 92)
 
     for m in TIME_BUDGETS_MIN:
-        t = distance_m(adult, m)
-        bm = mask & (d["network"] > t)
-        n = float(hh_no[bm].sum())
-        print(f"  car-free households beyond {m:2d} min ({t:,.0f} m): {n:>8,.0f} "
-              f"({100 * n / tot_no:.1f}%)")
+        print(f"\n--- {m}-minute walk ---")
+        print(f"{'profile':28s}{'group':>11s}{'flat (no slope)':>18s}"
+              f"{'with slope':>16s}{'of which no route':>19s}")
+        for r in s["profiles"]:
+            c = r[m]
+            print(f"{r['profile'].label:28s}{c['total']:>11,.0f}"
+                  f"{c['flat_beyond']:>11,.0f} ({c['flat_pct']:4.1f}%)"
+                  f"{c['beyond']:>9,.0f} ({c['pct']:4.1f}%)"
+                  f"{c['unreachable']:>14,.0f}")
+
+    print(f"\n--- car access, 15-minute adult standard (slope-aware) ---")
+    print(f"{'households':28s}{'total':>12s}{'beyond':>12s}{'rate':>9s}")
+    for k, lab in [("no_vehicle", "no vehicle available"), ("has_vehicle", "has a vehicle"),
+                   ("all", "all households")]:
+        t, b, p = s["car"][k]
+        print(f"{lab:28s}{t:>12,.0f}{b:>12,.0f}{p:>8.1f}%")
 
 
 if __name__ == "__main__":
@@ -80,5 +98,3 @@ if __name__ == "__main__":
 
     for k in sys.argv[1:] or ["seattle", "tacoma"]:
         report(k)
-    print("\nNOTE: distances are along the walk graph with no slope penalty. Both cities "
-          "are hilly,\nso the mobility-difficulty rows understate the real barrier.")

@@ -12,6 +12,7 @@ dependencies = [
     "numpy>=2.5.2",
     "osmnx>=2.1.1",
     "python-dotenv>=1.2.3",
+    "rasterio>=1.5.1",
     "requests>=2.34.2",
     "ripser>=0.6.15",
     "scipy>=1.18.0",

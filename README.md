@@ -231,6 +231,45 @@ Tacoma is markedly worse served than Seattle despite an almost identical
 population-per-branch ratio (26.1k vs 25.7k): **20.4% of Tacoma residents are within a
 15-minute walk, against 44.4% in Seattle.** Same resourcing, very different geography.
 
+
+## Phase 5 — slope, and the PDF report
+
+### Slope's real effect is passability, not speed
+
+Travel time now uses Tobler's hiking function renormalised to each profile's flat speed,
+over USGS 3DEP elevation (public, no API key). The mobility profile additionally treats
+segments steeper than the **ADA 8.33% maximum running slope** as impassable rather than
+merely slow — above that grade a route is not hard, it is unusable.
+
+Standards are now expressed in actual travel time, which is what "15-minute neighbourhood"
+literally says, rather than a distance proxy.
+
+| | Seattle | Tacoma |
+|---|---:|---:|
+| walk segments steeper than 8.33% | **13.1%** | 6.4% |
+| adults beyond 15 min — flat → slope-aware | 55.6% → 57.6% | 79.7% → 80.0% |
+| ambulatory difficulty beyond 15 min | 80.5% → **87.1%** | 90.7% → **93.1%** |
+| **residents with no ADA-compliant route at all** | **4,591** (17% of that group) | 776 (6%) |
+
+Adding slope moves the adult figure by ~2 points. It moves the ambulatory-difficulty
+figure by 7, and it strands 4,591 Seattle residents entirely — people for whom no route to
+any library stays within the ADA grade limit. **Slope matters through passability, and
+almost the whole effect lands on wheelchair users.** Seattle is twice as steep as Tacoma
+by this measure.
+
+Travel time is computed on the *transposed* graph, so it measures person → facility.
+With slope the graph is genuinely asymmetric and the direction matters.
+
+### The deliverable
+
+`ccl.report` renders a six-page A4 PDF per city — headline figures, travel-time map,
+walker-profile breakdown, the slope/ADA page, underserved pockets with population counts,
+and the siting benchmark, with methods and caveats stated on the page.
+
+```bash
+PYTHONPATH=src uv run python -m ccl.report seattle tacoma
+```
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.
@@ -279,9 +318,12 @@ what it uniquely offers (enclosed vs. edge), not for extent.
 
 ## Known limitations
 
-- **No slope penalty.** Distances are metres along the walk graph. Both cities are hilly,
-  so the ambulatory-difficulty rows understate the real barrier substantially — grade is
-  arguably a harder constraint than distance for a wheelchair user, and it is not modelled.
+- **Sidewalk quality is not modelled.** Slope is, but curb ramps, surface condition,
+  crossing delay and missing sidewalks are not — so the mobility figures stay optimistic
+  even with the ADA grade cutoff applied.
+- **Grade comes from the street centreline**, not the sidewalk, and a DEM sampled at 15 m
+  smooths short steep pitches.
+- **Travel time is one-way.** A downhill outbound trip is uphill on the return.
 - **Walking speeds are literature defaults, not measured.** The profile speeds are
   defensible planning values, but a real study would use local observed gait speeds.
 - **Car access is measured in households**, since that is how ACS publishes it; converting

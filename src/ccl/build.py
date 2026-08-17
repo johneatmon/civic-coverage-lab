@@ -19,7 +19,10 @@ from dotenv import load_dotenv
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from ccl.cities import City, get
+from scipy.sparse import csr_matrix
+
+from ccl.cities import PROFILES, City, get
+from ccl.elevation import edge_seconds, fetch_dem, sample
 from ccl.graph import build_csr
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -214,25 +217,50 @@ def build(city_key: str) -> dict:
     _, fac_idx = tree.query(np.column_stack([fac.geometry.x, fac.geometry.y]))
     fac_nodes = np.unique(fac_idx)
 
-    dn = dijkstra(csr, indices=fac_nodes, min_only=True)
+    # Flat-distance fields (metres), kept so the slope effect can be isolated.
+    # Transposed: a path from a facility in the reversed graph is a path *to* it in the
+    # original, which is the direction accessibility is defined in.
+    dn = dijkstra(csr.T.tocsr(), indices=fac_nodes, min_only=True)
     network = dn[cell_node] + snap
     euclid = cKDTree(np.column_stack([fac.geometry.x, fac.geometry.y])).query(
         np.column_stack([gx.ravel(), gy.ravel()]))[0].reshape(gx.shape)
 
-    dem = demand_rasters(city, xs, ys)
-    land = inside & (snap <= SNAP_MAX_M) & np.isfinite(network) & ~dem["water"]
-    inhabited = land & (dem["population_density"] >= MIN_DENSITY)
+    # Slope-aware travel time (seconds), one field per walker profile.
+    dem, transform = fetch_dem(city.key, tuple(boundary(city).to_crs(CRS_M).total_bounds))
+    elev = sample(dem, transform, node_xy)
+    elev = np.where(np.isnan(elev), np.nanmedian(elev), elev)
+
+    coo = csr.tocoo()
+    length = coo.data
+    rise = elev[coo.col] - elev[coo.row]
+    grade = np.divide(rise, length, out=np.zeros_like(length), where=length > 0.5)
+    grade = np.clip(grade, -0.6, 0.6)  # guard against DEM noise on very short edges
+
+    time_fields, impassable = {}, {}
+    for p in PROFILES:
+        secs = edge_seconds(length, grade, p.speed_mps, p.max_grade)
+        keep = np.isfinite(secs)
+        tm = csr_matrix((secs[keep], (coo.row[keep], coo.col[keep])), shape=csr.shape)
+        tn = dijkstra(tm.T.tocsr(), indices=fac_nodes, min_only=True)
+        # walking from the cell centre to the network, at the profile's flat speed
+        time_fields[f"time_{p.key}"] = tn[cell_node] + snap / p.speed_mps
+        impassable[p.key] = float((~keep).sum()) / len(secs)
+
+    dem_r = demand_rasters(city, xs, ys)
+    land = inside & (snap <= SNAP_MAX_M) & np.isfinite(network) & ~dem_r["water"]
+    inhabited = land & (dem_r["population_density"] >= MIN_DENSITY)
 
     payload = {
         "xs": xs, "ys": ys, "inside": inside, "snap": snap, "cell_node": cell_node,
         "network": network, "euclidean": euclid, "land": land, "inhabited": inhabited,
         "fac_nodes": fac_nodes, "node_xy": node_xy,
         "csr_data": csr.data, "csr_indices": csr.indices, "csr_indptr": csr.indptr,
-        "csr_shape": np.array(csr.shape),
-        **{k: v for k, v in dem.items()},
+        "csr_shape": np.array(csr.shape), "node_elev": elev, "edge_grade": grade,
+        **time_fields,
+        **{k: v for k, v in dem_r.items()},
     }
     np.savez_compressed(DATA / f"city_{city.key}.npz", **payload)
-    return {"city": city, "n_facilities": len(fac), **payload}
+    return {"city": city, "n_facilities": len(fac), "impassable": impassable, **payload}
 
 
 def load(city_key: str) -> dict:
@@ -258,3 +286,12 @@ if __name__ == "__main__":
         n = r["network"][inh]
         print(f"  walk dist (inhab.): mean {n[np.isfinite(n)].mean():,.0f} m  "
               f"max {n[np.isfinite(n)].max():,.0f} m")
+        print(f"  elevation         : {np.nanmin(r['node_elev']):.0f}-"
+              f"{np.nanmax(r['node_elev']):.0f} m; "
+              f"|grade|>8.33% on {100 * (np.abs(r['edge_grade']) > 0.0833).mean():.1f}% of edges")
+        for p in PROFILES:
+            tf = r[f"time_{p.key}"][inh] / 60.0
+            ok = np.isfinite(tf)
+            print(f"    {p.key:9s} median {np.median(tf[ok]):5.1f} min   "
+                  f"unreachable {100 * (~ok).mean():4.1f}% of inhabited cells"
+                  f"   (impassable edges {100 * r['impassable'][p.key]:.1f}%)")
