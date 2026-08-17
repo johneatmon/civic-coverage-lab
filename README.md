@@ -270,6 +270,59 @@ and the siting benchmark, with methods and caveats stated on the page.
 PYTHONPATH=src uv run python -m ccl.report seattle tacoma
 ```
 
+
+## Phase 6 — is the ADA cutoff doing the work?
+
+Treating a segment above 8.33% as impassable is a modelling choice, so it was stress-tested
+two ways: the threshold, and the model form.
+
+### The "no route" count is fragile
+
+| max grade | 1:20 | 1:16 | **1:12 (ADA)** | 1:10 | 1:8 | 15% |
+|---|---:|---:|---:|---:|---:|---:|
+| Seattle, no route | 12,848 | 9,637 | **4,591** | 2,945 | 1,564 | 1,008 |
+| Tacoma, no route | 3,710 | 2,744 | **776** | 463 | 257 | 177 |
+
+A factor of ~13 across defensible thresholds. **This number should never be quoted alone.**
+
+### The finding underneath it is not
+
+The share beyond a 15-minute walk barely moves, whatever you assume:
+
+| Seattle, ambulatory difficulty | no cutoff | 5× penalty | 25× penalty | hard cutoff | 1:20 hard |
+|---|---:|---:|---:|---:|---:|
+| beyond 15 min | 82% | 86% | 87% | 87% | 93% |
+
+An 11-point spread across the entire range from "slope is free" to the most punitive
+assumption available.
+
+### What the "stranded" actually face
+
+The decisive test. Take exactly the cells the ADA cutoff calls unreachable, and recompute
+with **no slope penalty at all** — the most generous assumption possible:
+
+| | Seattle | Tacoma |
+|---|---:|---:|
+| cohort | 4,591 | 776 |
+| median walk, zero slope penalty | **43 min** | **53 min** |
+| p90 | 77 min | 133 min |
+| already over 60 min | 18% | 33% |
+
+These are not people stranded by a modelling artifact. They are in genuinely remote places
+before slope is considered at all — a 43-minute median walk under assumptions that ignore
+terrain entirely. **Slope is a second-order effect layered on an already severe access
+deficit.**
+
+### And it is bimodal
+
+For residents who keep an ADA-compliant route, the detour costs almost nothing: median
+1.07× in Seattle, 1.00× in Tacoma, with only 17% / 7% facing more than 1.5×. Either grade
+is a non-issue for you or it removes your route entirely — there is very little middle.
+
+**Reporting consequence:** the phrase "N residents have no route" was replaced throughout
+with the robust framing — the count, its threshold range, and what the cohort faces with no
+slope penalty at all. The PDF now states all three.
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.

@@ -17,6 +17,7 @@ from scipy import ndimage
 from ccl.bench import results as bench_results
 from ccl.build import DATA
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, get
+from ccl.sensitivity import stranded_profile
 from ccl.standards import summary
 
 OUT = Path(__file__).resolve().parents[2] / "out"
@@ -87,14 +88,16 @@ def build_report(city_key: str, k: int = 8) -> Path:
 
         c = S["profiles"][0][15]
         m = S["profiles"][2][15]
+        st = stranded_profile(city_key)
         headline = [
             (f"{covered_pct:.0f}%", "of residents can reach a library within a\n"
                                     "15-minute walk (slope-aware travel time)"),
             (f"{c['beyond']:,.0f}", "people are beyond that 15-minute standard"),
             (f"{m['pct']:.0f}%", "of residents with an ambulatory difficulty are\n"
                                  "beyond a 15-minute walk"),
-            (f"{m['unreachable']:,.0f}", "have no route at all within the ADA maximum\n"
-                                         "running slope of 8.33%"),
+            (f"{st['median_min_no_penalty']:.0f} min", "is the median walk faced by the "
+                                                       "worst-served of\nthat group — before "
+                                                       "any slope penalty at all"),
         ]
         y = 0.74
         for big, cap in headline:
@@ -177,7 +180,8 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- page 4
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Slope, and who it excludes",
-               "Above the ADA 8.33% running slope a route is not slow — it is unusable")
+               "Grade excludes people that distance alone does not, and the effect "
+               "is concentrated")
         tm = d["time_mobility"] / 60.0
         unreach = d["land"] & ~np.isfinite(d["time_mobility"])
         ax = fig.add_axes([0.08, 0.34, 0.84, 0.53])
@@ -185,15 +189,21 @@ def build_report(city_key: str, k: int = 8) -> Path:
         cb = fig.colorbar(im, ax=ax, shrink=0.62, pad=0.02)
         cb.set_label("minutes at 0.80 m/s, ADA-compliant routes only", fontsize=9)
         mob = S["profiles"][2][15]
+        st = stranded_profile(city_key)
         _para(fig, 0.285,
-              f"Cyan marks land with no ADA-compliant walking route to any library. "
-              f"{S['grade_steep_pct']:.1f}% of walk\nsegments exceed the 8.33% limit, "
-              f"which strands {mob['unreachable']:,.0f} residents with an ambulatory "
-              f"difficulty entirely —\n"
-              f"{100 * mob['unreachable'] / mob['total']:.0f}% of that population. "
-              f"Slope changes the adult figure by only about two points; its real\n"
-              f"effect is not speed but passability, and it falls almost wholly on "
-              f"wheelchair users.")
+              f"Cyan marks land with no ADA-compliant walking route to any library: "
+              f"{st['count']:,.0f} residents with an\nambulatory difficulty, "
+              f"{100 * st['count'] / mob['total']:.0f}% of that group. "
+              f"{S['grade_steep_pct']:.1f}% of walk segments exceed the 8.33% limit.\n\n"
+              f"That count is sensitive to the threshold — it ranges "
+              f"{st['range'][0]:,.0f}–{st['range'][1]:,.0f} between a 1:20 and a 1:8 "
+              f"cutoff — so it\nshould not be read as a precise figure. The finding "
+              f"underneath it is not sensitive. These are\nremote locations before slope "
+              f"is considered at all: with no slope penalty whatsoever the same\n"
+              f"cohort still faces a median {st['median_min_no_penalty']:.0f}-minute walk, "
+              f"and {st['pct_over_60_no_penalty']:.0f}% of them over an hour. Slope is a "
+              f"second\neffect on top of an already severe access deficit, and it falls "
+              f"almost wholly on wheelchair users.")
         _footer(fig, city, 4); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 5
