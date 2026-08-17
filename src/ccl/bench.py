@@ -189,7 +189,7 @@ def results(city_key: str, k: int = 8, minutes: int = 15) -> dict:
     rows = {n: score(s, p, standard) for n, p in strategies.items()}
     rnd = [score(s, random_picks(s, k, sd), standard) for sd in range(5)]
     rows["random (mean of 5)"] = {kk: float(np.mean([r[kk] for r in rnd])) for kk in base}
-    return {"s": s, "base": base, "rows": rows, "picks": strategies,
+    return {"s": s, "base": base, "rows": rows, "picks": strategies, "cov": cov,
             "standard": standard, "minutes": minutes, "k": k}
 
 

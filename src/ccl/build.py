@@ -24,6 +24,7 @@ from scipy.sparse import csr_matrix
 from ccl.cities import PROFILES, City, get
 from ccl.elevation import edge_seconds, fetch_dem, sample
 from ccl.graph import build_csr
+from ccl.landuse import mask as landuse_mask
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
@@ -162,12 +163,28 @@ def _water(city: City) -> gpd.GeoDataFrame:
                 f"areawater_{city.state}{city.county}").to_crs(city.crs)
 
 
-def demand_rasters(city: City, xs, ys) -> dict:
+def demand_rasters(city: City, xs, ys, alloc: np.ndarray | None = None,
+                   water: np.ndarray | None = None,
+                   nonres: np.ndarray | None = None) -> dict:
+    """Rasterise ACS counts, allocated dasymetrically onto habitable land.
+
+    Spreading a block group's population evenly over its whole area puts phantom
+    residents in its parks, ports and airfields -- which then register as underserved
+    demand and attract siting markers. Instead each unit's count is divided among only
+    its habitable cells, which conserves the unit total and puts people where they live.
+    """
     gx, gy = np.meshgrid(xs, ys)
     cells = gpd.GeoDataFrame(geometry=gpd.points_from_xy(gx.ravel(), gy.ravel()),
                              crs=city.crs)
-    cell_km2 = (GRID_M / 1000.0) ** 2
     out: dict[str, np.ndarray] = {}
+    cell_km2 = (GRID_M / 1000.0) ** 2
+    alloc_flat = None if alloc is None else alloc.ravel()
+    # The habitable *fraction* must be measured on a pure land-use domain. Including the
+    # city-boundary or distance-to-network conditions here would put cells in the
+    # denominator that can never be in the numerator, deflating the fraction and
+    # inflating density for every unit that straddles the boundary.
+    land_all = None if water is None else (~water).ravel()
+    hab_all = None if land_all is None else (land_all & ~nonres.ravel())
 
     plans = [
         ("block group", {**BG_VARS}, {"pop_65plus": BG_65}),
@@ -189,13 +206,47 @@ def demand_rasters(city: City, xs, ys) -> dict:
                                        units[n] / units["land_km2"], 0.0)
         j = gpd.sjoin(cells, units, how="left", predicate="within")
         j = j[~j.index.duplicated(keep="first")].reindex(cells.index)
-        for n in names:
-            d = np.nan_to_num(j[n + "_d"].to_numpy(dtype=float)).reshape(gx.shape)
-            out[n + "_density"] = d
-            out[n] = d * cell_km2
+        uidx = j["index_right"].to_numpy()
+        valid = ~np.isnan(uidx)
+        ui = np.where(valid, np.nan_to_num(uidx), -1).astype(int)
+        nunits = len(units)
 
-    out["water"] = cells.within(_water(city).union_all()).to_numpy().reshape(gx.shape)
+        if alloc_flat is None:
+            for n in names:
+                d = np.nan_to_num(j[n + "_d"].to_numpy(dtype=float)).reshape(gx.shape)
+                out[n + "_density"] = d
+                out[n] = d * cell_km2
+            continue
+
+        # Habitable fraction of each unit, estimated from the grid sample, applied to its
+        # true land area. Density stays a per-unit constant, so a block group straddling
+        # the city boundary contributes only its in-city share -- normalising by a count
+        # of in-grid cells instead would dump its whole population inside the line.
+        hab = np.bincount(ui[valid & hab_all], minlength=nunits)
+        allc = np.bincount(ui[valid & land_all], minlength=nunits)
+        frac = np.divide(hab, allc, out=np.ones(nunits), where=allc > 0)
+        frac = np.clip(frac, 0.02, 1.0)  # never divide a unit's population by ~zero area
+        hab_km2 = np.maximum(units["land_km2"].to_numpy(dtype=float) * frac, 1e-6)
+
+        for n in names:
+            vals = np.nan_to_num(units[n].to_numpy(dtype=float))
+            dens = vals / hab_km2
+            take = np.zeros(len(ui), dtype=float)
+            ok = valid & alloc_flat
+            take[ok] = dens[ui[ok]]
+            arr = take.reshape(gx.shape)
+            out[n + "_density"] = arr
+            out[n] = arr * cell_km2
+
+    if alloc_flat is None:
+        out["water"] = cells.within(_water(city).union_all()).to_numpy().reshape(gx.shape)
     return out
+
+
+def _water_mask(city: City, xs, ys) -> np.ndarray:
+    gx, gy = np.meshgrid(xs, ys)
+    cells = gpd.GeoSeries(gpd.points_from_xy(gx.ravel(), gy.ravel()), crs=city.crs)
+    return cells.within(_water(city).union_all()).to_numpy().reshape(gx.shape)
 
 
 # ------------------------------------------------------------------ assembly
@@ -250,13 +301,23 @@ def build(city_key: str) -> dict:
         time_fields[f"time_{p.key}"] = tn[cell_node] + snap / p.speed_mps
         impassable[p.key] = float((~keep).sum()) / len(secs)
 
-    dem_r = demand_rasters(city, xs, ys)
-    land = inside & (snap <= SNAP_MAX_M) & np.isfinite(network) & ~dem_r["water"]
-    inhabited = land & (dem_r["population_density"] >= MIN_DENSITY)
+    # Water and large non-residential land first, so population can be allocated onto
+    # habitable cells rather than smeared across parks and port terminals.
+    water = demand_rasters(city, xs, ys)["water"] if False else None
+    water = _water_mask(city, xs, ys)
+    nonres = landuse_mask(city, xs, ys)
+    land = inside & (snap <= SNAP_MAX_M) & np.isfinite(network) & ~water
+    habitable = land & ~nonres
+
+    dem_r = demand_rasters(city, xs, ys, alloc=habitable, water=water, nonres=nonres)
+    dem_r["water"] = water
+    dem_r["nonresidential"] = nonres
+    inhabited = habitable & (dem_r["population_density"] >= MIN_DENSITY)
 
     payload = {
         "xs": xs, "ys": ys, "inside": inside, "snap": snap, "cell_node": cell_node,
-        "network": network, "euclidean": euclid, "land": land, "inhabited": inhabited,
+        "network": network, "euclidean": euclid, "land": land,
+        "inhabited": inhabited, "habitable": habitable,
         "fac_nodes": fac_nodes, "node_xy": node_xy,
         "csr_data": csr.data, "csr_indices": csr.indices, "csr_indptr": csr.indptr,
         "csr_shape": np.array(csr.shape), "node_elev": elev, "edge_grade": grade,

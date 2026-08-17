@@ -388,6 +388,60 @@ threshold sweep moves the underserved figure by one point (98%–99%).
 Persistent homology loses to random placement in all three cities, on a flat grid as much
 as on a hilly peninsula.
 
+
+## Phase 8 — where nobody lives
+
+Review of the Tacoma report caught a real defect: the underserved-pocket markers proposed
+a branch in the middle of **Point Defiance Park** and another in the **Port of Tacoma**
+tideflats. Two compounding bugs.
+
+**Block-group density smears residents across parks and ports.** Spreading a block group's
+population evenly over its whole area puts phantom residents in its 275 ha regional park,
+its port terminals and its airfields. They then count as underserved demand.
+
+**The marker was the pocket's worst-served point.** That point is *systematically*
+non-residential — a park or a port is by construction far from everything, so it wins the
+anchor almost every time. The marker was never meant as a siting recommendation, but on a
+page of numbered pins it reads as one, and it was pointing at the worst possible places.
+
+### Fixes
+
+**Dasymetric allocation.** Large non-residential OSM polygons (parks, forest, industrial,
+port, cemetery, military, quarry, airfield — above a 2 ha threshold, so pocket parks do not
+punch holes through residential blocks) now define uninhabitable land. Each census unit's
+count is spread over its *habitable* area only, at a density derived from its habitable
+fraction — which conserves the unit total and keeps units straddling the city boundary
+proportional. Getting that normalisation right took two attempts: dividing by a count of
+in-grid habitable cells dumped each straddling unit's whole population inside the city
+line (Seattle +10.4% against published), and measuring the habitable fraction on a domain
+that included the boundary and network-distance conditions deflated it the other way.
+
+**The marker is now the best available site.** For each pocket it is the candidate location
+that brings the most residents within 15 minutes — an MCLP marginal-gain calculation
+restricted to habitable land — which is also consistent with phase 3's finding that MCLP is
+the right siting engine. Pockets themselves are cut over habitable land, so parks and port
+terminals are no longer shaded as underserved at all.
+
+Top sites now resolve to real neighbourhoods: Greenwood, Alaska Junction, Uptown and
+Rainier Valley in Seattle; Hilltop, Northeast Tacoma and Linden Lane in Tacoma.
+
+### What it changed, and what it did not
+
+| | before | after |
+|---|---:|---:|
+| Seattle adults beyond 15 min | 57.6% | 57.5% |
+| Seattle ambulatory difficulty | 87.1% | 86.8% |
+| Seattle no ADA route | 4,591 | 4,481 |
+| Seattle car-free HH underserved | 38.4% | 38.1% |
+| Tacoma adults beyond 15 min | 80.0% | 79.5% |
+| Phoenix adults beyond 15 min | 95.0% | 95.0% |
+
+**The aggregate figures barely move** — under half a point everywhere. The phantom
+population was spatially concentrated in parks and ports rather than spread through the
+city, so it distorted *where* the tool pointed without distorting *how many* it counted.
+The maps and every siting recommendation changed materially; the headline percentages did
+not.
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.

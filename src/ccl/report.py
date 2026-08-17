@@ -14,6 +14,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import ListedColormap, LogNorm
 from scipy import ndimage
 
+from ccl.bench import field_from as bench_field
 from ccl.bench import results as bench_results
 from ccl.build import DATA
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, get
@@ -207,25 +208,47 @@ def build_report(city_key: str, k: int = 8) -> Path:
         _footer(fig, city, 4); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 5
+        R = bench_results(city_key, k=k)
+        sb, cov = R["s"], R["cov"]
+        base_cov = ((bench_field(sb, d["fac_nodes"]) <= R["standard"])
+                    & d["inhabited"]).ravel()
+        popflat = np.where(d["inhabited"].ravel(), d["population"].ravel(), 0.0)
+        gain_all = (cov & ~base_cov) @ popflat
+
         fig = plt.figure(figsize=PAGE)
-        _title(fig, "Underserved pockets", "Contiguous areas beyond a 15-minute walk, "
-                                           "ranked by residents affected")
-        lab, n = ndimage.label((t15 > 15) & d["land"],
+        _title(fig, "Underserved pockets and best sites",
+               "Contiguous residential areas beyond a 15-minute walk, ranked by "
+               "residents affected")
+        # Pockets are cut over habitable land only. Including parks, port terminals and
+        # airfields would shade land nobody lives on and -- since such places are by
+        # construction far from everything -- place the marker in the middle of one.
+        lab, n = ndimage.label((t15 > 15) & d["habitable"],
                                structure=ndimage.generate_binary_structure(2, 1))
         pk = []
         for i in range(1, n + 1):
             reg = lab == i
             if reg.sum() < 2:
                 continue
-            mm = np.where(reg, t15, -np.inf)
-            r0, c0 = np.unravel_index(np.argmax(mm), mm.shape)
+            # Marker = the candidate site inside this pocket that would bring the most
+            # residents within the standard, not the pocket's worst-served point. The
+            # worst-served point is systematically the emptiest corner of the pocket.
+            inpocket = np.array([bool(reg[r, c]) for r, c in sb["cand_rc"]])
+            if inpocket.any():
+                gi = np.where(inpocket, gain_all, -1.0)
+                bi = int(np.argmax(gi))
+                mr, mc = sb["cand_rc"][bi]
+                gain, xy = float(gain_all[bi]), (d["xs"][mc], d["ys"][mr])
+            else:
+                mm = np.where(reg, t15, -np.inf)
+                r0, c0 = np.unravel_index(np.argmax(mm), mm.shape)
+                gain, xy = 0.0, (d["xs"][c0], d["ys"][r0])
             pk.append({"pop": float(d["population"][reg].sum()), "reg": reg,
                        "km2": reg.sum() * 0.0225, "worst": float(t15[reg].max()),
                        "nocar": float(d["no_vehicle_hh"][reg].sum()),
-                       "xy": (d["xs"][c0], d["ys"][r0])})
+                       "gain": gain, "xy": xy})
         pk.sort(key=lambda x: -x["pop"])
 
-        dens = np.where(d["land"] & (d["population_density"] > 0),
+        dens = np.where(d["habitable"] & (d["population_density"] > 0),
                         d["population_density"], np.nan)
         ax = fig.add_axes([0.08, 0.36, 0.84, 0.51])
         xs, ys = d["xs"], d["ys"]
@@ -249,19 +272,25 @@ def build_report(city_key: str, k: int = 8) -> Path:
         for sp in ax.spines.values():
             sp.set_color("#bbb")
 
-        rows = [("#", "residents", "car-free HH", "area", "worst walk")]
+        rows = [("#", "residents", "car-free HH", "area", "worst walk", "site gains")]
         for i, p in enumerate(pk[:6], 1):
             rows.append((str(i), f"{p['pop']:,.0f}", f"{p['nocar']:,.0f}",
-                         f"{p['km2']:.1f} km²", f"{p['worst']:.0f} min"))
+                         f"{p['km2']:.1f} km²", f"{p['worst']:.0f} min",
+                         f"{p['gain']:,.0f}"))
         tax = fig.add_axes([0.08, 0.15, 0.84, 0.17]); tax.axis("off")
-        tb = tax.table(cellText=rows[1:], colLabels=rows[0], loc="center", cellLoc="right")
+        tb = tax.table(cellText=rows[1:], colLabels=rows[0], loc="center",
+                       cellLoc="right", colWidths=[0.09, 0.20, 0.19, 0.17, 0.18, 0.17])
         tb.auto_set_font_size(False); tb.set_fontsize(8.5); tb.scale(1, 1.6)
         for j in range(len(rows[0])):
             tb[0, j].set_facecolor("#eee"); tb[0, j].set_text_props(fontweight="bold")
+        _para(fig, 0.115,
+              "Numbered markers are the best available branch site inside each pocket — "
+              "the location that\nbrings the most residents within 15 minutes — chosen "
+              "from habitable land only, so parks,\nport terminals and airfields are "
+              "never proposed.")
         _footer(fig, city, 5); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 6
-        R = bench_results(city_key, k=k)
         fig = plt.figure(figsize=PAGE)
         _title(fig, f"Where should the next {k} branches go?",
                "Siting strategies scored on residents brought within 15 minutes")
