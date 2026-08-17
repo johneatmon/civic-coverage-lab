@@ -147,6 +147,90 @@ speak to that. But for "tell me where the next branch goes," topology is the wro
 Notably MCLP does not improve worst-case walk *at all* (+0 m). MCLP and worst-point are
 complementary, and neither one needs topology.
 
+
+## Phase 4 — real standards, walker profiles, and a second city
+
+A civil engineer for the City of Tacoma reviewed this and made three points that reshaped
+the framing:
+
+- Network-snapped walking distance is **already routine GIS practice**; cities including
+  Tacoma have library service-area maps built this way. The novel part is the *count of
+  people outside the service area*, not the distance calculation.
+- Agencies set their own standards — Metro Parks Tacoma uses a 10-minute walk.
+- Tacoma's most recent Comprehensive Plan adopts the **15-minute neighbourhood** goal, and
+  **0.75 mi (1,207 m)** is the defensible operational threshold; 0.5 mi is the alternative
+  if you are explicitly accounting for all ages and abilities.
+
+The 1,200 m used in phases 2–3 lands within 7 m of that, so earlier results carry over.
+The 0.75 mi / 15 min pairing implies 3 mph (1.34 m/s), which reproduces the standard US
+planning heuristic exactly: 5 min = ¼ mi, 10 min = ½ mi, 15 min = ¾ mi.
+
+### A time standard is not one distance
+
+His "all ages and abilities" point is the interesting one, because it means a time-based
+standard resolves to a different distance for every kind of walker — and each distance
+applies to a *different population*, not a share of the whole city.
+
+| profile | speed | 10 min | 15 min | basis |
+|---|---:|---:|---:|---|
+| Adult (planning standard) | 1.34 m/s | 804 m | 1,206 m | 3 mph; the ¼–½–¾ mile heuristic |
+| Older adult (65+) | 1.00 m/s | 600 m | 900 m | gait-speed literature; MUTCD uses 1.07 m/s where older pedestrians are present |
+| Ambulatory difficulty | 0.80 m/s | 480 m | 720 m | manual wheelchair / walking-aid speeds |
+
+![standards by profile](out/standards_by_profile.png)
+
+Share of each group beyond a walk to the nearest library, network distance:
+
+| profile | Seattle 10 min | Seattle 15 min | Tacoma 10 min | Tacoma 15 min |
+|---|---:|---:|---:|---:|
+| Adult | 76.8% | 55.6% | 90.9% | 79.7% |
+| Older adult (65+) | 88.5% | 73.6% | 95.4% | 89.3% |
+| Ambulatory difficulty | 91.4% | **80.5%** | 96.1% | **90.7%** |
+
+**Seattle meets the 15-minute standard for 44% of adults but only 19% of residents with
+an ambulatory difficulty.** The same sentence in a comprehensive plan describes two very
+different cities depending on who is walking. Tacoma: 20% of adults, 9% of residents with
+an ambulatory difficulty.
+
+### Car access inverts the naive equity assumption
+
+Walking distance binds hardest on households without a car — everyone else has an
+alternative. The expectation is that car-free households are the worse-served group. They
+are not:
+
+| Seattle households | total | beyond 15 min | rate |
+|---|---:|---:|---:|
+| no vehicle available | 65,317 | 23,355 | **35.8%** |
+| has a vehicle | 277,081 | 158,553 | **57.2%** |
+
+Car-free households are *substantially better* served, because they cluster in dense
+urban cores — which is exactly where the libraries already are. Tacoma shows the same
+direction but far weaker (72.2% vs 80.0%), and both figures are dire.
+
+This is worth stating plainly because it cuts against the obvious framing: on this
+measure, walkable-access inequity in Seattle is not primarily about car ownership. It is
+about age and mobility.
+
+### The benchmark replicates in Tacoma
+
+Same experiment, 8 new branches, 15-minute adult standard:
+
+| strategy | Seattle | Tacoma |
+|---|---:|---:|
+| **MCLP greedy** | **+95,810** (100%) | **+54,354** (100%) |
+| random (mean of 5) | +34,064 (36%) | +18,001 (33%) |
+| PH by persistence | +20,131 (21%) | +19,086 (35%) |
+| PH by population | +18,867 (20%) | +9,526 (18%) |
+| worst-point (no topology) | +2,603 (3%) | +1,398 (3%) |
+
+MCLP dominates in both cities by roughly 3–5×. PH edges past random in Tacoma — where
+baseline coverage is only 20%, so geometric gaps coincide more often with populated land —
+and loses to it in Seattle. The phase-3 conclusion holds on a second city.
+
+Tacoma is markedly worse served than Seattle despite an almost identical
+population-per-branch ratio (26.1k vs 25.7k): **20.4% of Tacoma residents are within a
+15-minute walk, against 44.4% in Seattle.** Same resourcing, very different geography.
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.
@@ -195,8 +279,13 @@ what it uniquely offers (enclosed vs. edge), not for extent.
 
 ## Known limitations
 
-- **Distance, not time.** Metres along the walk graph, no slope penalty. Seattle's hills
-  are a real cost this does not price.
+- **No slope penalty.** Distances are metres along the walk graph. Both cities are hilly,
+  so the ambulatory-difficulty rows understate the real barrier substantially — grade is
+  arguably a harder constraint than distance for a wheelchair user, and it is not modelled.
+- **Walking speeds are literature defaults, not measured.** The profile speeds are
+  defensible planning values, but a real study would use local observed gait speeds.
+- **Car access is measured in households**, since that is how ACS publishes it; converting
+  to people would need an assumption about car-free household size.
 - **Coarse demand geography.** Poverty and car-free households are tract-level, so they
   smear across the block-group population raster.
 - **Seattle flatters the thesis.** Near-best case — water everywhere, few bridges. A
