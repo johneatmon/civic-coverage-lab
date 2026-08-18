@@ -5,7 +5,7 @@ and separate walker profiles — then benchmarked against classical facility-loc
 optimisation to see whether the topology the project started from actually helps.
 
 Case studies: libraries in Seattle (28 branches), Tacoma (8) and Phoenix (17); parks in
-Seattle (254) and Tacoma (70). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
+Seattle (254) and Tacoma (66). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
 
 ```bash
 uv run python -m ccl.build seattle tacoma phoenix         # libraries (default)
@@ -141,8 +141,16 @@ therefore every network node inside a park or within 25 m of it — 11,550 of th
 Seattle's 254 parks, against 28 for its 28 libraries.
 
 Seattle uses the city's own parcel-level parks layer, dissolved to 254 parks; Tacoma uses
-**Metro Parks Tacoma's authoritative layer**, filtered to MPT's own 72-park analysis set
-(see the validation section below).
+**Metro Parks Tacoma's authoritative layer**, filtered to MPT's own analysis set (see the
+validation section below).
+
+Facilities are clipped to the city. An agency's property list can reach well outside it —
+MPT operates **Northwest Trek**, a 288 ha wildlife park 39 km away in Eatonville, plus
+Browns Point and Dash Point in unincorporated Pierce County. Those four contributed *zero*
+access nodes, because the walk graph stops at the city boundary, yet the straight-line
+measure could still see them. That let the crow-flies rung count parks the network rung
+structurally cannot reach — worth only ~0.2 points here, but it is an asymmetry between two
+rungs whose difference is the entire point of the ladder.
 
 | beyond the standard | Seattle libraries (15 min) | Seattle parks (10 min) | Tacoma parks (10 min) |
 |---|---:|---:|---:|
@@ -151,6 +159,7 @@ Seattle uses the city's own parcel-level parks layer, dissolved to 254 parks; Ta
 | ambulatory difficulty | 93.2% | **72.2%** | 76.3% |
 | **mobility gap** (ambulatory − adult) | 36 pts | **53 pts** | 36 pts |
 | no route within a 5% grade | 12,484 | 9,566 | 2,512 |
+| parks | 28 branches | 254 | 66 |
 
 Parks are far better distributed than libraries — a fifth of Seattle adults are beyond a
 10-minute walk to a park against well over half for a 15-minute walk to a library. **But the
@@ -234,6 +243,9 @@ for the Washington cities is the obvious v2.
 
 Sidewalk presence and quality, curb ramps, crossing delay, cross slope (2.1% under PROWAG,
 a common real-world failure), transit, opening hours and branch capacity are all unmodelled.
+The walk graph stops at the city boundary, so a genuinely walkable destination just across
+the line is invisible to every rung — consistent between them, but it understates access at
+the city edge.
 Grade comes from street centrelines, not sidewalks. Every one of those omissions pushes the
 same way: the mobility figures here are optimistic. Walking speeds are planning defaults,
 not locally observed; travel time is one-way.

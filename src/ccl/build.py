@@ -101,7 +101,7 @@ def fetch_facilities(city: City, am: Amenity) -> gpd.GeoDataFrame:
 
     if am.geometry == "polygon":
         gdf = gdf[gdf.geometry.geom_type.isin(["Polygon", "MultiPolygon"])].to_crs(city.crs)
-        name = next((c for c in ("NAME", "name") if c in gdf.columns), None)
+        name = next((c for c in gdf.columns if c.lower() == "name"), None)
         if name and "exclude_name" in spec:
             pat = "|".join(spec["exclude_name"])
             gdf = gdf[~gdf[name].fillna("").str.upper().str.contains(pat)]
@@ -114,9 +114,25 @@ def fetch_facilities(city: City, am: Amenity) -> gpd.GeoDataFrame:
     else:
         gdf = gdf.to_crs(city.crs)
         gdf["geometry"] = gdf.geometry.centroid
-        name = next((c for c in ("NAME", "name") if c in gdf.columns), None)
+        name = next((c for c in gdf.columns if c.lower() == "name"), None)
         gdf = gdf[([name] if name else []) + ["geometry"]].reset_index(drop=True)
         gdf = gdf.to_crs("EPSG:4326")
+
+    # Keep only facilities that touch the city. An agency's property list can include
+    # holdings far outside it -- Metro Parks Tacoma operates Northwest Trek, a 288 ha
+    # wildlife park 39 km away in Eatonville. Such a facility contributes no access nodes,
+    # because the walk graph stops at the city boundary, but it *is* visible to the
+    # straight-line measure, which would let the crow-flies rung count facilities the
+    # network rung structurally cannot reach.
+    poly = boundary(city).to_crs(city.crs).union_all()
+    gm = gdf.to_crs(city.crs)
+    keep_mask = gm.geometry.intersects(poly)
+    if (~keep_mask).any():
+        nm = next((c for c in gdf.columns if c.lower() == "name"), None)
+        dropped = [str(x) for x in (gdf.loc[~keep_mask.to_numpy(), nm] if nm else [])]
+        print(f"  dropped {int((~keep_mask).sum())} {am.key} outside {city.key}"
+              + (f": {', '.join(dropped[:4])}" if dropped else ""))
+    gdf = gdf[keep_mask.to_numpy()].reset_index(drop=True)
 
     gdf.to_file(out, driver="GeoJSON")
     return gdf
