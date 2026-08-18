@@ -1,9 +1,19 @@
+# python
 __pycache__/
-.venv/
 *.pyc
+.venv/
+
+# secrets
+.env
+
+# generated deliverables — shipped as release assets
+out/
+
+# downloaded / derived data: all of it is re-fetchable by `ccl.build`
+cache/
 data/*.graphml
 data/*.npz
-.env
+data/*.tif
+data/*_landuse.geojson
 data/cb_*/
 data/areawater_*/
-out/
