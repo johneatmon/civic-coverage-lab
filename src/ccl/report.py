@@ -18,6 +18,7 @@ from ccl.bench import field_from as bench_field
 from ccl.bench import results as bench_results
 from ccl.build import DATA
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, get
+from ccl.ladder import rungs as ladder_rungs
 from ccl.sensitivity import stranded_profile
 from ccl.standards import summary
 
@@ -27,8 +28,12 @@ INK = "#1a1a1a"
 ACCENT = "#c1440e"
 
 
-def _footer(fig, city, page):
-    fig.text(0.5, 0.022, f"Civic Coverage Lab · {city.place} · page {page}",
+_PAGE = {"n": 0}
+
+
+def _footer(fig, city, page=None):
+    _PAGE["n"] += 1
+    fig.text(0.5, 0.022, f"Civic Coverage Lab · {city.place} · page {_PAGE['n']}",
              ha="center", fontsize=7.5, color="#777")
 
 
@@ -79,6 +84,14 @@ def build_report(city_key: str, k: int = 8) -> Path:
     t15 = d[f"time_{adult.key}"] / 60.0
     covered_pct = 100 * (1 - S["profiles"][0][15]["pct"] / 100)
 
+    # Siting results are needed by both the benchmark page and the pocket markers.
+    R = bench_results(city_key, k=k)
+    sb, cov = R["s"], R["cov"]
+    base_cov = ((bench_field(sb, d["fac_nodes"]) <= R["standard"]) & d["inhabited"]).ravel()
+    popflat = np.where(d["inhabited"].ravel(), d["population"].ravel(), 0.0)
+    gain_all = (cov & ~base_cov) @ popflat
+
+    _PAGE["n"] = 0
     with PdfPages(path) as pdf:
         # ---------------------------------------------------------------- page 1
         fig = plt.figure(figsize=PAGE)
@@ -117,6 +130,113 @@ def build_report(city_key: str, k: int = 8) -> Path:
               f"Sources  OpenStreetMap walk network · US Census ACS 5-year 2023 · "
               f"USGS 3DEP elevation", size=10)
         _footer(fig, city, 1); pdf.savefig(fig); plt.close(fig)
+
+        # ---------------------------------------------------------------- ladder
+        fig = plt.figure(figsize=PAGE)
+        _title(fig, "How you measure changes the answer",
+               "Each step is the same city and the same branches, measured more carefully")
+        rs = ladder_rungs(city_key)
+        ax = fig.add_axes([0.30, 0.55, 0.62, 0.31])
+        yy = np.arange(len(rs))
+        bars = ax.barh(yy, [r["pct"] for r in rs],
+                       color=["#9bb7d4", "#5b8db8", "#2a6f97", "#c1440e"],
+                       edgecolor="black", lw=0.6)
+        for b, r in zip(bars, rs):
+            ax.text(b.get_width() - 1.2, b.get_y() + b.get_height() / 2,
+                    f"{r['pct']:.0f}%", va="center", ha="right", fontsize=9,
+                    fontweight="bold", color="white")
+        ax.set_yticks(yy)
+        ax.set_yticklabels([r["name"][3:] + "\n" + r["detail"] for r in rs], fontsize=8.5)
+        ax.invert_yaxis(); ax.set_xlim(0, 100)
+        ax.set_xlabel("% of the relevant population beyond the standard", fontsize=9)
+        ax.grid(axis="x", alpha=0.25); ax.set_axisbelow(True)
+
+        gap = rs[2]["pct"] - rs[0]["pct"]
+        _para(fig, 0.50,
+              f"A straight-line radius — the way service areas are still often drawn — "
+              f"reports {rs[0]['pct']:.0f}% of\nresidents beyond a 15-minute walk. "
+              f"Routing along real streets and then charging for terrain\nputs it at "
+              f"{rs[2]['pct']:.0f}%. "
+              f"**Straight-line coverage understates the underserved population here by "
+              f"{gap:.0f}\npoints, or {rs[2]['n'] - rs[0]['n']:,.0f} people.**".replace("**", ""))
+        _para(fig, 0.425,
+              f"The first three bars hold the population fixed, so the differences are "
+              f"purely a matter of how\naccess is measured. The fourth changes both the "
+              f"model and who it applies to: at 0.80 m/s with\na 5% maximum grade, "
+              f"{rs[3]['pct']:.0f}% of residents with an ambulatory difficulty are beyond "
+              f"the same standard.")
+        _para(fig, 0.345, "Which step matters most is a property of the city", size=11,
+              weight="bold")
+        _para(fig, 0.313,
+              f"In {city.place.split(',')[0]} the network step costs "
+              f"{rs[1]['pct'] - rs[0]['pct']:+.0f} points and terrain "
+              f"{rs[2]['pct'] - rs[1]['pct']:+.0f}. Street networks impose a detour\n"
+              f"penalty everywhere — a grid forces Manhattan travel, roughly 1.3x "
+              f"straight-line — so the\nnetwork step is large even in flat, regular "
+              f"cities. Terrain is what varies.")
+        _footer(fig, city); pdf.savefig(fig); plt.close(fig)
+
+        # ---------------------------------------------------------------- benchmark
+        fig = plt.figure(figsize=PAGE)
+        _title(fig, "Finding the gaps is not the same as filling them",
+               f"Five strategies for siting {k} new branches, scored on residents brought "
+               f"within 15 minutes")
+        names = list(R["rows"])
+        gains = [R["rows"][nm]["covered"] - R["base"]["covered"] for nm in names]
+        order = np.argsort(gains)[::-1]
+        ax = fig.add_axes([0.36, 0.60, 0.56, 0.26])
+        colors = []
+        for i in order:
+            colors.append("#2a9d8f" if names[i].startswith("MCLP")
+                          else "#e4572e" if names[i].startswith("PH") else "#bbb")
+        bars = ax.barh(range(len(names)), [gains[i] for i in order], color=colors,
+                       edgecolor="black", lw=0.6)
+        ax.set_yticks(range(len(names)))
+        ax.set_yticklabels([names[i] for i in order], fontsize=8.5)
+        ax.invert_yaxis()
+        ax.set_xlabel("additional residents within a 15-minute walk", fontsize=9)
+        ax.grid(axis="x", alpha=0.25); ax.set_axisbelow(True)
+        for b, i in zip(bars, order):
+            ax.text(b.get_width() * 1.01, b.get_y() + b.get_height() / 2,
+                    f"+{gains[i]:,.0f}", va="center", fontsize=8, fontweight="bold")
+        best = max(gains)
+        rnd = R["rows"]["random (mean of 5)"]["covered"] - R["base"]["covered"]
+        php = R["rows"]["PH by persistence"]["covered"] - R["base"]["covered"]
+        phn = R["rows"]["PH by population"]["covered"] - R["base"]["covered"]
+
+        _para(fig, 0.555,
+              f"This project began from a paper that uses topology — persistent homology — "
+              f"to find holes in\ncivic coverage. It finds them. It is a poor guide to "
+              f"filling them.", size=10)
+        _para(fig, 0.505,
+              f"Classical maximal-covering location (MCLP) adds {best:,.0f} residents, "
+              f"raising coverage from\n{covered_pct:.0f}% to "
+              f"{covered_pct + 100 * best / S['population']:.0f}%. Both topological "
+              f"strategies ({php:,.0f} and {phn:,.0f}) land below five\nrandom draws "
+              f"({rnd:,.0f}). Topological holes are a diagnostic, not an optimiser.")
+        _para(fig, 0.415, "Why distance-driven strategies lose", size=11, weight="bold")
+        _para(fig, 0.383,
+              "Persistence marks the most remote point of a gap, and remoteness is nearly "
+              "uninformative about\nhow many people a branch would reach: across the "
+              "candidate pool the correlation between a\nsite's travel time from existing "
+              "branches and its marginal coverage gain is +0.01. Random\nsampling at "
+              "least draws from the middle of that distribution; targeting the extreme "
+              "draws from\nits emptiest tail, which is why the no-topology "
+              "worst-point rule finishes last of all.", size=9)
+        _para(fig, 0.275, "The counterintuitive part", size=11, weight="bold")
+        _para(fig, 0.243,
+              "Weighting holes by population made the result worse, not better. It does "
+              "not select small dense\nholes — it selects the largest ones (median pocket "
+              "population 168,663 against 67,639 for the\npersistence ranking). The "
+              "weighting ranks the region correctly, then still places at the "
+              "worst-served\npoint inside it — and a larger region has a more extreme "
+              "extremum. So it picks a better\nneighbourhood and a worse corner of it. "
+              "The population signal never reaches the decision.", size=9)
+        _para(fig, 0.125,
+              f"Candidate sites are habitable cells on a 450 m grid ({len(R['s']['cand_nodes']):,} "
+              f"of them). Greedy MCLP is\n(1-1/e)-optimal for max-coverage, so an exact "
+              f"solve would only widen its margin.", size=8.5, color="#555")
+        _footer(fig, city); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 2
         fig = plt.figure(figsize=PAGE)
@@ -208,13 +328,6 @@ def build_report(city_key: str, k: int = 8) -> Path:
         _footer(fig, city, 4); pdf.savefig(fig); plt.close(fig)
 
         # ---------------------------------------------------------------- page 5
-        R = bench_results(city_key, k=k)
-        sb, cov = R["s"], R["cov"]
-        base_cov = ((bench_field(sb, d["fac_nodes"]) <= R["standard"])
-                    & d["inhabited"]).ravel()
-        popflat = np.where(d["inhabited"].ravel(), d["population"].ravel(), 0.0)
-        gain_all = (cov & ~base_cov) @ popflat
-
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Underserved pockets and best sites",
                "Contiguous residential areas beyond a 15-minute walk, ranked by "
@@ -297,47 +410,53 @@ def build_report(city_key: str, k: int = 8) -> Path:
               size=9)
         _footer(fig, city, 5); pdf.savefig(fig); plt.close(fig)
 
-        # ---------------------------------------------------------------- page 6
+        # ---------------------------------------------------------------- method
         fig = plt.figure(figsize=PAGE)
-        _title(fig, f"Where should the next {k} branches go?",
-               "Siting strategies scored on residents brought within 15 minutes")
-        names = list(R["rows"])
-        gains = [R["rows"][nm]["covered"] - R["base"]["covered"] for nm in names]
-        order = np.argsort(gains)[::-1]
-        ax = fig.add_axes([0.36, 0.55, 0.56, 0.30])
-        bars = ax.barh(range(len(names)), [gains[i] for i in order],
-                       color=["#2a9d8f" if names[i].startswith("MCLP") else "#bbb"
-                              for i in order], edgecolor="black", lw=0.6)
-        ax.set_yticks(range(len(names)))
-        ax.set_yticklabels([names[i] for i in order], fontsize=8.5)
-        ax.invert_yaxis()
-        ax.set_xlabel("additional residents within a 15-minute walk", fontsize=9)
-        ax.grid(axis="x", alpha=0.25); ax.set_axisbelow(True)
-        for b, i in zip(bars, order):
-            ax.text(b.get_width() * 1.01, b.get_y() + b.get_height() / 2,
-                    f"+{gains[i]:,.0f}", va="center", fontsize=8, fontweight="bold")
-        best = max(gains)
-        _para(fig, 0.50,
-              f"Greedy maximal-covering location (MCLP) adds {best:,.0f} residents with "
-              f"{k} branches, raising\ncoverage from {covered_pct:.0f}% to "
-              f"{covered_pct + 100 * best / S['population']:.0f}%. It is scored here "
-              f"against topological and trivial alternatives;\nsee the repository for the "
-              f"full comparison. Candidate sites are inhabited cells on a 450 m grid.")
-        _para(fig, 0.36, "Method and caveats", size=12, weight="bold")
-        _para(fig, 0.325,
-              "Walk network from OpenStreetMap, retaining all connected components. "
-              "Travel time uses Tobler's\nhiking function renormalised to each profile's "
-              "flat speed; the mobility profile additionally treats\nsegments steeper "
-              "than 5% as impassable. Population is ACS 2023 block-group data "
-              "rasterised to\na 150 m grid; poverty, vehicle access and ambulatory "
-              "difficulty are tract-level and therefore coarser.\n\n"
-              "Known limits: sidewalk quality, curb ramps, crossing delay and transit are "
-              "not modelled, so the\nmobility figures remain optimistic even with slope. "
-              "Walking speeds are literature defaults rather\nthan locally observed. "
-              "Travel time is one-way; a downhill outbound trip is uphill on return.\n"
-              "Facility sets are branch locations only and take no account of opening "
-              "hours or capacity.")
-        _footer(fig, city, 6); pdf.savefig(fig); plt.close(fig)
+        _title(fig, "Method and known limits", "What this models, and what it does not")
+        _para(fig, 0.87,
+              "Walk network from OpenStreetMap, retaining all connected components — a "
+              "city's pedestrian\nnetwork is generally not one component, and the default "
+              "of keeping only the largest silently\ndeletes whole districts. Travel time "
+              "uses Tobler's hiking function renormalised to each profile's\nflat speed, "
+              "over USGS 3DEP elevation at 15 m. Population is ACS 2023 block-group data "
+              "allocated\nonto habitable land; poverty, vehicle access and ambulatory "
+              "difficulty are tract-level and coarser.")
+        _para(fig, 0.745, "The 5% grade is a threshold, and thresholds are a modelling "
+                          "choice", size=11, weight="bold")
+        _para(fig, 0.713,
+              f"The mobility profile treats segments steeper than 5% as impassable. Real "
+              f"mobility is not binary,\nand this was chosen for tractability and "
+              f"legibility rather than realism. Two things bound the\nconsequences. The "
+              f"count is sensitive to where the line is drawn — it ranges "
+              f"{st['range'][0]:,.0f}–{st['range'][1]:,.0f}\nacross cutoffs from 4% to "
+              f"15%, so it should never be quoted alone. But under a graded penalty\n"
+              f"instead of a cutoff, nobody is stranded and the same cohort still faces a "
+              f"median\n{st['median_min_no_penalty']:.0f}-minute walk with no slope "
+              f"penalty applied at all. The exclusion is structural remoteness\n"
+              f"compounded by terrain, not an artefact of the threshold.")
+        _para(fig, 0.535, "Not modelled", size=11, weight="bold")
+        _para(fig, 0.503,
+              "Sidewalk presence and quality, curb ramps, crossing delay, cross slope "
+              "(capped at 2.1% under\nPROWAG and a common real-world failure), transit, "
+              "opening hours and branch capacity. Grade is\ntaken from street "
+              "centrelines, not sidewalks. Every one of these omissions pushes the same\n"
+              "way: the mobility figures here are optimistic.\n\n"
+              "Walking speeds are planning defaults, not locally observed. Travel time is "
+              "one-way — a downhill\noutbound trip is uphill on the return. Facility sets "
+              "are branch locations only.")
+        _para(fig, 0.345, "Sources", size=11, weight="bold")
+        _para(fig, 0.313,
+              "OpenStreetMap (walk network, land use) · US Census ACS 5-year 2023 and "
+              "TIGER (population,\ndemographics, water) · USGS 3DEP (elevation) · "
+              "municipal open data (branch locations).\n\n"
+              "Grade thresholds follow the 2010 ADA Standards and the US Access Board's "
+              "PROWAG: an accessible\nroute is limited to 1:20 (5%); 1:12 (8.3%) applies "
+              "to ramps and curb ramps, not to walking a\nblock. PROWAG permits a route "
+              "to match the adjacent street grade where that exceeds 5%, so a\nsteep "
+              "sidewalk may be compliant — 5% is the grade an accessible route is designed "
+              "to, which is\nwhy this report says “within a 5% grade” and not "
+              "“ADA-compliant”.", size=9)
+        _footer(fig, city); pdf.savefig(fig); plt.close(fig)
 
     return path
 

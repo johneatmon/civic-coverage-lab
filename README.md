@@ -486,6 +486,72 @@ The robustness argument holds. The count is still threshold-sensitive (966–18,
 genuinely remote before grade enters: with *no* slope penalty at all they face a median
 41-minute walk in Seattle, 62 in Tacoma, 145 in Phoenix.
 
+
+## Phase 10 — the ladder, the mechanism, and positioning
+
+Three additions from review.
+
+### The missing rung
+
+The original thesis was radius → network → terrain → mobility profile, but the naive
+baseline was never computed, so the divergence at each step could not be quoted. `ccl.ladder`
+now does it, and the headline number is the one a planner or journalist would actually use:
+
+| Seattle | measure | beyond a 15-min walk |
+|---|---|---:|
+| 1. Straight-line radius | 1,206 m as the crow flies | 35.8% |
+| 2. + street network | 1,206 m along the walk graph | 55.4% (+19.7 pp) |
+| 3. + terrain | 15 min at 3 mph, slope-adjusted | 57.5% (+2.1 pp) |
+| 4. + mobility profile | 15 min at 0.80 m/s, 5% max grade | 92.5% |
+
+**Straight-line coverage understates Seattle's underserved population by 21.7 points —
+156,787 people.** Tacoma: 17.0 points. Phoenix: 5.2 points (compressed only because Phoenix
+starts at 89.9% underserved by radius, leaving little headroom).
+
+### Why population-weighted PH does worse than persistence-ranked PH
+
+The plausible explanation — that population weighting selects small dense holes with low
+marginal gain — is wrong. Measured, it selects the **largest** pockets: median pocket
+population 168,663 against 67,639 for the persistence ranking.
+
+The real mechanism is that population ranks the *region* while the placement rule still
+picks the worst-served *point inside it*. A larger region has a more extreme extremum, so
+the weighting selects a better neighbourhood and then a worse corner of it. The population
+signal never reaches the decision.
+
+Underneath both is the number that explains the whole benchmark: across the candidate pool
+the correlation between a site's travel time from existing branches and its marginal
+coverage gain is **+0.01**. Remoteness is uninformative about coverage. Random sampling
+draws from the middle of that distribution (median gain 3,575); every distance-driven rule
+deliberately samples its emptiest tail.
+
+| Seattle, median per strategy | marginal gain | pocket population | min from a branch |
+|---|---:|---:|---:|
+| MCLP greedy | 10,978 | 62,601 | 23 |
+| PH by persistence | 2,160 | 67,639 | 34 |
+| PH by population | 1,149 | 168,663 | 40 |
+| worst-point | 477 | 67,182 | 46 |
+
+### Positioning
+
+UW's Taskar Center already does planner-facing pedestrian accessibility analysis —
+**Walkshed** — and runs it on **OS-CONNECT**, a statewide sidewalk network with curb ramps
+and crossings. On network fidelity in Washington they win outright; anything on street
+centrelines is a proxy. The differentiators here are the per-profile decomposition with its
+own population denominators, the siting benchmark, and portability: OS-CONNECT is
+Washington-only, and this pipeline ran Phoenix by changing a UTM zone and a county FIPS.
+Swapping in OS-CONNECT for the Washington cities is the obvious v2.
+
+### Report structure
+
+Now eight pages, reordered to lead with the findings rather than bury them: headline, the
+measurement ladder, the siting benchmark (with the mechanism), travel-time map, walker
+profiles, grade exclusion, underserved pockets and best sites, method and limits. The
+method page now states plainly that the 5% hard cutoff was chosen for tractability, and
+bounds the consequence both ways.
+
+[WRITEUP.md](WRITEUP.md) is the narrative version, and leads with the negative result.
+
 ## Method
 
 Sublevel-set persistent homology of the nearest-facility distance field, 150 m grid.
