@@ -5,7 +5,7 @@ and separate walker profiles — then benchmarked against classical facility-loc
 optimisation to see whether the topology the project started from actually helps.
 
 Case studies: libraries in Seattle (28 branches), Tacoma (8) and Phoenix (17); parks in
-Seattle (254) and Tacoma (126). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
+Seattle (254) and Tacoma (70). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
 
 ```bash
 uv run python -m ccl.build seattle tacoma phoenix         # libraries (default)
@@ -140,13 +140,17 @@ to a centroid would put Point Defiance's access point 800 m into the woods. Acce
 therefore every network node inside a park or within 25 m of it — 11,550 of them across
 Seattle's 254 parks, against 28 for its 28 libraries.
 
+Seattle uses the city's own parcel-level parks layer, dissolved to 254 parks; Tacoma uses
+**Metro Parks Tacoma's authoritative layer**, filtered to MPT's own 72-park analysis set
+(see the validation section below).
+
 | beyond the standard | Seattle libraries (15 min) | Seattle parks (10 min) | Tacoma parks (10 min) |
 |---|---:|---:|---:|
-| adults | 57.4% | **19.6%** | 27.0% |
-| 65+ | 75.1% | 33.9% | 48.8% |
-| ambulatory difficulty | 93.2% | **72.2%** | 70.6% |
-| **mobility gap** (ambulatory − adult) | 36 pts | **53 pts** | 44 pts |
-| no route within a 5% grade | 12,484 | 9,566 | 2,289 |
+| adults | 57.4% | **19.6%** | 40.4% |
+| 65+ | 75.1% | 33.9% | 59.9% |
+| ambulatory difficulty | 93.2% | **72.2%** | 76.3% |
+| **mobility gap** (ambulatory − adult) | 36 pts | **53 pts** | 36 pts |
+| no route within a 5% grade | 12,484 | 9,566 | 2,512 |
 
 Parks are far better distributed than libraries — a fifth of Seattle adults are beyond a
 10-minute walk to a park against well over half for a 15-minute walk to a library. **But the
@@ -157,16 +161,64 @@ mobility gap is much wider**, 53 points against 36.
 | mean walk-segment grade | city-wide | near libraries | near parks |
 |---|---:|---:|---:|
 | Seattle | 3.9% | **3.0%** | **4.7%** |
-| Tacoma | 2.6% | 2.6% | **3.3%** |
+| Tacoma | 2.6% | 2.6% | **2.9%** |
 
 A library is a building, and buildings go where building is cheap — Seattle's branches sit
 on land *flatter* than the city average. Parkland is disproportionately what was left over:
 ravines, greenbelts, bluffs, the slopes too steep to develop. So the amenity that is most
-evenly distributed by count is the least evenly accessible by mobility, and the effect is
-strongest exactly where the terrain is worst.
+evenly distributed by count is the least evenly accessible by mobility.
+
+The effect is strong in Seattle and weak in Tacoma (2.9% against a 2.6% city average), which
+is what the mechanism predicts: it needs terrain to bite. It also shrank once Tacoma switched
+to Metro Parks Tacoma's authoritative layer — the OSM set had put it at 3.3% by including
+state and county holdings like Dash Point State Park that MPT does not manage. Worth stating,
+since the weaker number is the one measured against the parks the standard is actually about.
 
 That is a finding you cannot get from a single amenity, and it is the argument for the
 `(city, amenity)` shape.
+
+
+## Validation against an agency's own published analysis
+
+Metro Parks Tacoma publishes both its park layer and its **own 10-minute walkshed**. That
+makes Tacoma parks the one case in this project where the output can be checked against the
+agency's own work rather than against plausibility.
+
+Tacoma parks now use MPT's authoritative layer, filtered to their own analysis set
+(`Anlyss_Lyr > 0` — their Neighborhood, Community, Regional and Natural Area tiers), so both
+analyses cover the same 72 parks against the same standard.
+
+**Their published walkshed is a straight-line buffer, not a network walkshed.** The evidence
+is geometric:
+
+| construction, same 72 parks | area |
+|---|---:|
+| network, 804 m | 63.2 km² |
+| network, 804 m, all 84 MPT properties | 65.8 km² |
+| **straight-line, 804 m** | **89.0 km²** |
+| **MPT published walkshed** | **89.4 km²** |
+
+The straight-line buffer matches their published figure to **0.4%**. No network construction
+comes within 25 km², including one using every MPT property rather than the analysis set.
+
+### What that costs
+
+| Tacoma, 10-minute park standard | straight-line | network + terrain | overstated by |
+|---|---:|---:|---:|
+| adults | 80.6% | **59.6%** | 21.0 pts (44,184 people) |
+| 65+ | 62.6% | **40.1%** | 22.5 pts (6,843) |
+| ambulatory difficulty | 52.1% | **23.7%** | 28.4 pts (3,953) |
+
+A straight-line buffer is standard practice, not an error — it is exactly rung 1 of the
+measurement ladder, and the Trust for Public Land's own ParkServe uses network walksheds
+precisely because of this gap. But the consequence is concrete: **Tacoma's published park
+access figure overstates it by 21 points for adults and 28 for residents with an ambulatory
+difficulty**, and the overstatement is largest for the group least able to absorb it.
+
+This is also the closest thing the project has to external validation. Two independent
+implementations of the same standard on the same parks agree to 0.4% on area once the
+*method* is matched — which is evidence the pipeline is sound, and that the disagreement is
+about measurement choice rather than execution.
 
 ## Positioning
 

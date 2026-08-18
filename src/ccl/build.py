@@ -84,8 +84,9 @@ def fetch_facilities(city: City, am: Amenity) -> gpd.GeoDataFrame:
 
     if spec["kind"] in ("arcgis_service", "arcgis_url"):
         url = spec.get("url") or f"{ARCGIS_ROOT}/{spec['service']}/FeatureServer/0/query"
-        r = requests.get(url, params={"where": "1=1", "outFields": "*",
-                                      "outSR": "4326", "f": "geojson"}, timeout=300)
+        r = requests.get(url, params={"where": spec.get("where", "1=1"),
+                                      "outFields": "*", "outSR": "4326",
+                                      "f": "geojson"}, timeout=300)
         r.raise_for_status()
         gdf = gpd.GeoDataFrame.from_features(r.json()["features"], crs="EPSG:4326")
     else:

@@ -174,12 +174,24 @@ The reason is in the land:
 | mean walk-segment grade | city-wide | near libraries | near parks |
 |---|---:|---:|---:|
 | Seattle | 3.9% | **3.0%** | **4.7%** |
-| Tacoma | 2.6% | 2.6% | **3.3%** |
+| Tacoma | 2.6% | 2.6% | **2.9%** |
 
 A library is a building and buildings go where building is cheap, so branches sit on land
 flatter than the city average. Parkland is largely what was left over — ravines, greenbelts,
 bluffs, the slopes nobody could develop. The amenity that looks most equitably distributed
 when you count facilities is the least equitable once you account for who is walking.
+
+The effect is strong in Seattle and weak in Tacoma, which is what the mechanism predicts —
+it needs terrain to bite.
+
+Tacoma parks also gave the project its only external check. Metro Parks Tacoma publishes its
+own 10-minute walkshed, so I ran their 72-park analysis set against their own standard. Their
+published walkshed is 89.4 km²; a straight-line 804 m buffer of those parks is 89.0 km², a
+0.4% match, while no network construction comes within 25 km². **Their published figure is a
+crow-flies buffer**, and against network distance with terrain it overstates park access by
+21 points for adults and 28 for residents with an ambulatory difficulty. Straight-line
+buffers are standard practice rather than an error — that is exactly rung 1 of the ladder —
+but it is the difference between 80.6% and 59.6% of a city.
 
 Getting there required one real modelling change: a park is a polygon you enter at its edge,
 so access nodes are every network node inside it or within 25 m, not a centroid. For Point

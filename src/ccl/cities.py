@@ -157,11 +157,16 @@ AMENITIES = {
                                "services/Park_Boundary_%28details%29/FeatureServer/2/query",
                         "dissolve": "NAME", "exclude_name": _PARK_EXCLUDE,
                         "min_area_m2": _PARK_MIN_AREA_M2},
-            "tacoma": {"kind": "osm",
-                       "tags": {"leisure": ["park", "nature_reserve"],
-                                "landuse": "recreation_ground"},
-                       "exclude_access": ("private", "no"),
-                       "exclude_name": _PARK_EXCLUDE,
+            # Metro Parks Tacoma's own layer, filtered to their own analysis set.
+            # Anlyss_Lyr is their classification tier: 0 is excluded, 1-4 are
+            # Neighborhood / Community / Regional Park and Natural Area. Using their
+            # inclusion criteria is what makes the result comparable to the 10-minute
+            # walkshed they publish themselves.
+            "tacoma": {"kind": "arcgis_url",
+                       "url": "https://services1.arcgis.com/WGzzp37bqYMLyzDR/arcgis/rest/"
+                              "services/MPT_Parks_Properties_System_and_Strategic_Plan/"
+                              "FeatureServer/0/query",
+                       "where": "Anlyss_Lyr > 0",
                        "min_area_m2": _PARK_MIN_AREA_M2},
         },
     ),

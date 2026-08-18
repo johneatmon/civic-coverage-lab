@@ -125,8 +125,8 @@ for c in CITIES:
 print("\nPARKS (second amenity)")
 import geopandas as gpd
 from ccl.build import DATA as _D
-park = {"seattle": (254, 19.6, 33.9, 72.2, 9566), "tacoma": (126, 27.0, 48.8, 70.6, 2289)}
-grade = {"seattle": (3.9, 3.0, 4.7), "tacoma": (2.6, 2.6, 3.3)}
+park = {"seattle": (254, 19.6, 33.9, 72.2, 9566), "tacoma": (70, 40.4, 59.9, 76.3, 2512)}
+grade = {"seattle": (3.9, 3.0, 4.7), "tacoma": (2.6, 2.6, 2.9)}
 for c, (nf, pa, po, pm, nr) in park.items():
     Sp = summary(c, "parks")
     chk(f"park count {c}", nf, Sp["n_facilities"])
