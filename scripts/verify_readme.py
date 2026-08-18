@@ -31,17 +31,17 @@ D = {c: load(c) for c in CITIES}
 R = {c: results(c, k=8) for c in CITIES}
 
 print("ACCESS TABLE")
-for c, br, pop, rpb, med in [("seattle", 28, 721942, 25784, 19),
-                             ("tacoma", 8, 210290, 26286, 26),
-                             ("phoenix", 17, 1522291, 89547, 53)]:
+for c, br, pop, rpb, med in [("seattle", 28, 722212, 25793, 19),
+                             ("tacoma", 8, 212330, 26541, 26),
+                             ("phoenix", 17, 1539333, 90549, 53)]:
     d, m = D[c], D[c]["land"]
     chk(f"branches {c}", br, int(d["fac_nodes"].size))
     chk(f"population {c}", pop, d["population"][m].sum(), 2)
     chk(f"residents per branch {c}", rpb, d["population"][m].sum() / int(d["fac_nodes"].size), 2)
     chk(f"median walk {c}", med, np.median(d["time_adult"][d["inhabited"]] / 60.0), 0.5)
 
-pcts = {"seattle": (57.5, 75.0, 93.2), "tacoma": (79.5, 89.5, 95.4),
-        "phoenix": (95.0, 97.4, 98.5)}
+pcts = {"seattle": (57.5, 75.0, 92.9), "tacoma": (79.7, 89.6, 95.6),
+        "phoenix": (95.1, 97.4, 98.5)}
 for c in CITIES:
     d, m = D[c], D[c]["land"]
     for p, cl in zip(PROFILES, pcts[c]):
@@ -50,9 +50,9 @@ for c in CITIES:
             100 * d[p.pop_field][m & ~(d[f"time_{p.key}"] <= 900)].sum() / tot, 0.05)
 
 print("\nLADDER")
-lad = {"seattle": (35.8, 55.4, 57.5, 93.2, 21.7, 155907),
-       "tacoma": (62.5, 79.2, 79.5, 95.4, 17.0, 35775),
-       "phoenix": (89.9, 95.0, 95.0, 98.5, 5.2, 78795)}
+lad = {"seattle": (35.8, 55.5, 57.5, 92.9, 21.7, 156927),
+       "tacoma": (62.9, 79.4, 79.7, 95.6, 16.8, 35765),
+       "phoenix": (90.0, 95.1, 95.1, 98.5, 5.1, 78977)}
 for c in CITIES:
     rs = rungs(c)
     for i in range(4):
@@ -61,12 +61,14 @@ for c in CITIES:
     chk(f"understates people {c}", lad[c][5], rs[2]["n"] - rs[0]["n"], 5)
 
 print("\nTERRAIN / CAR ACCESS")
-terr = {"seattle": (24.6, 12484, 46), "tacoma": (14.4, 3087, 22), "phoenix": (1.9, 1063, 1.3)}
-car = {"seattle": (38.1, 58.6), "tacoma": (72.1, 80.0), "phoenix": (92.4, 94.7)}
-det = {"seattle": 1.32, "tacoma": 1.35, "phoenix": 1.35}
+terr = {"seattle": (24.5, 12288, 45), "tacoma": (14.0, 3284, 23), "phoenix": (1.9, 1066, 1)}
+car = {"seattle": (38.3, 58.6), "tacoma": (72.3, 80.2), "phoenix": (92.4, 94.8)}
+det = {"seattle": 1.32, "tacoma": 1.35, "phoenix": 1.34}
 for c in CITIES:
     d, m = D[c], D[c]["land"]
-    chk(f"steep >5% {c}", terr[c][0], 100 * float((np.abs(d["edge_grade"]) > 0.05).mean()), 0.05)
+    eic = d["edge_in_city"]
+    chk(f"steep >5% {c}", terr[c][0],
+        100 * float((np.abs(d["edge_grade"][eic]) > 0.05).mean()), 0.05)
     st = stranded_profile(c)
     chk(f"no route within 5% {c}", terr[c][1], st["count"], 3)
     chk(f"  as pct of group {c}", terr[c][2],
@@ -81,24 +83,24 @@ for c in CITIES:
     w = d["population"][mm]
     o = np.argsort(r)
     chk(f"median detour {c}", det[c], r[o][np.searchsorted(np.cumsum(w[o]) / w.sum(), 0.5)], 0.005)
-chk("Seattle threshold range low", 1057, stranded_profile("seattle")["range"][0], 3)
-chk("Seattle threshold range high", 19775, stranded_profile("seattle")["range"][1], 3)
+chk("Seattle threshold range low", 846, stranded_profile("seattle")["range"][0], 3)
+chk("Seattle threshold range high", 18603, stranded_profile("seattle")["range"][1], 3)
 chk("Seattle median walk, no penalty", 41, stranded_profile("seattle")["median_min_no_penalty"], 0.5)
 
 print("\nSITING BENCHMARK")
-bench = {"MCLP greedy": [84183, 50304, 86538], "PH by persistence": [23096, 9333, 12462],
-         "PH by population": [16409, 22563, 7283],
-         "worst-point (no topology)": [5139, 6507, 4722]}
+bench = {"MCLP greedy": [87779, 52626, 86538], "PH by persistence": [25014, 8624, 8508],
+         "PH by population": [16437, 16366, 1003],
+         "worst-point (no topology)": [4627, 6907, 970]}
 for nm, vals in bench.items():
     for c, v in zip(CITIES, vals):
         chk(f"{nm[:22]} {c}", v, R[c]["rows"][nm]["covered"] - R[c]["base"]["covered"], 1)
 
-rnd = {"seattle": 33845, "tacoma": 21918, "phoenix": 24453}
-pct = {"seattle": (6.7, 0.0), "tacoma": (0.0, 63.3), "phoenix": (0.0, 0.0)}
-corr = {"seattle": 0.02, "tacoma": -0.13, "phoenix": -0.26}
-med_g = {"seattle": 3575, "tacoma": 2699, "phoenix": 2847}
-wp_g = {"seattle": 477, "tacoma": 66, "phoenix": 91}
-share = {"seattle": 40.6, "tacoma": 90.8, "phoenix": 98.4}
+rnd = {"seattle": 33301, "tacoma": 21521, "phoenix": 27816}
+pct = {"seattle": (10.0, 0.0), "tacoma": (0.0, 10.0), "phoenix": (0.0, 0.0)}
+corr = {"seattle": 0.01, "tacoma": -0.16, "phoenix": -0.27}
+med_g = {"seattle": 3559, "tacoma": 2645, "phoenix": 2826}
+wp_g = {"seattle": 407, "tacoma": 907, "phoenix": 117}
+share = {"seattle": 40.6, "tacoma": 90.4, "phoenix": 98.3}
 for c in CITIES:
     s, d, cov, std = R[c]["s"], D[c], R[c]["cov"], R[c]["standard"]
     base_cov = R[c]["base"]["covered"]
@@ -125,8 +127,8 @@ for c in CITIES:
 print("\nPARKS (second amenity)")
 import geopandas as gpd
 from ccl.build import DATA as _D
-park = {"seattle": (254, 19.6, 33.9, 72.2, 9566), "tacoma": (66, 40.4, 59.9, 76.3, 2512)}
-grade = {"seattle": (3.9, 3.0, 4.7), "tacoma": (2.6, 2.6, 2.9)}
+park = {"seattle": (254, 19.6, 33.8, 71.5, 9576), "tacoma": (66, 40.7, 60.2, 76.0, 2502)}
+grade = {"seattle": (3.9, 3.0, 4.6), "tacoma": (2.5, 2.6, 2.8)}
 for c, (nf, pa, po, pm, nr) in park.items():
     Sp = summary(c, "parks")
     chk(f"park count {c}", nf, Sp["n_facilities"])
@@ -137,7 +139,8 @@ for c, (nf, pa, po, pm, nr) in park.items():
     csr_ = csr_matrix((dd["csr_data"], dd["csr_indices"], dd["csr_indptr"]),
                       shape=tuple(dd["csr_shape"]))
     coo_ = csr_.tocoo(); g_ = np.abs(dd["edge_grade"]); nxy = dd["node_xy"]
-    chk(f"city-wide mean grade {c}", grade[c][0], g_.mean() * 100, 0.05)
+    eic_ = dd["edge_in_city"]
+    chk(f"city-wide mean grade {c}", grade[c][0], g_[eic_].mean() * 100, 0.05)
     cty = get(c)
     for i, am_ in enumerate(("libraries", "parks"), start=1):
         fac = gpd.read_file(_D / f"{c}_{am_}.geojson").to_crs(cty.crs)
@@ -145,6 +148,7 @@ for c, (nf, pa, po, pm, nr) in park.items():
         buf = gpd.GeoDataFrame(geometry=fac.geometry.buffer(150), crs=cty.crs)
         hit = np.zeros(len(nxy), dtype=bool)
         hit[gpd.sjoin(nodes, buf, how="inner", predicate="within").index.unique().to_numpy()] = True
-        chk(f"mean grade near {am_} {c}", grade[c][i], g_[hit[coo_.row]].mean() * 100, 0.05)
+        chk(f"mean grade near {am_} {c}", grade[c][i],
+            g_[hit[coo_.row] & eic_].mean() * 100, 0.05)
 
 print(f"\n{'=' * 76}\n  {ok} verified, {fail} MISMATCHED\n{'=' * 76}")

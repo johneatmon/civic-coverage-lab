@@ -70,7 +70,7 @@ def _map(ax, s, values, title, cmap="magma_r", norm=None, vmax=None, unreachable
                    vmin=None if norm else 0, vmax=None if norm else vmax,
                    interpolation="nearest")
     if unreachable is not None and unreachable.any():
-        # explicit single colour -- a colormap here silently renders magenta at vmax
+        # explicit single color -- a colormap here silently renders magenta at vmax
         ax.imshow(np.where(unreachable, 1.0, np.nan), origin="lower", extent=extent,
                   cmap=ListedColormap(["#00e5ff"]), vmin=0, vmax=1, alpha=0.95,
                   interpolation="nearest")
@@ -152,7 +152,7 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
 
         _para(fig, 0.26,
               f"Scope   {S['n_facilities']} {am.label} · "
-              f"{d['land'].sum() * 0.0225:,.0f} km² analysed · "
+              f"{d['land'].sum() * 0.0225:,.0f} km² analyzed · "
               f"{S['population']:,.0f} residents\n"
               f"Terrain  elevation {S['elev_range'][0]:.0f}–{S['elev_range'][1]:.0f} m · "
               f"{S['grade_steep_pct']:.1f}% of walk segments steeper than the 5% accessible-route grade\n"
@@ -243,7 +243,7 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
               f"raising coverage from\n{covered_pct:.0f}% to "
               f"{covered_pct + 100 * best / S['population']:.0f}%. Both topological "
               f"strategies ({php:,.0f} and {phn:,.0f}) land below five\nrandom draws "
-              f"({rnd:,.0f}). Topological holes are a diagnostic, not an optimiser.")
+              f"({rnd:,.0f}). Topological holes are a diagnostic, not an optimizer.")
         _para(fig, 0.415, "Why distance-driven strategies lose", size=11, weight="bold")
         _para(fig, 0.383,
               f"Persistence marks the most remote point of a gap, and remoteness turns out "
@@ -275,7 +275,7 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
                f"{MECH['largest_share']:.0f}%,\nso ranking them by population is a real "
                f"choice. It still hurts: the weighting ranks the region\ncorrectly, then "
                f"places at the worst-served point inside it — and a larger region has a "
-               f"more\nextreme extremum. It picks a better neighbourhood and a worse "
+               f"more\nextreme extremum. It picks a better neighborhood and a worse "
                f"corner of it, so the population\nsignal never reaches the decision."),
               size=9)
         _para(fig, 0.125,
@@ -296,7 +296,7 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
               f"Median walk is {np.nanmedian(t15[d['inhabited']]):.0f} minutes. "
               f"Blue marks the {S['n_facilities']} {am.label}. Darker areas are further "
               f"in time, not distance — a\nsteep half-mile costs more than a flat one. "
-              f"Areas outside the analysed land mask (open water,\n"
+              f"Areas outside the analyzed land mask (open water,\n"
               f"and cells more than 250 m from any mapped pedestrian way) are blank.")
         _footer(fig, city, 2); pdf.savefig(fig); plt.close(fig)
 
@@ -461,11 +461,11 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
               "Walk network from OpenStreetMap, retaining all connected components — a "
               "city's pedestrian\nnetwork is generally not one component, and the default "
               "of keeping only the largest silently\ndeletes whole districts. Travel time "
-              "uses Tobler's hiking function renormalised to each profile's\nflat speed, "
+              "uses Tobler's hiking function renormalized to each profile's\nflat speed, "
               "over USGS 3DEP elevation at 15 m. Population is ACS 2023 block-group data "
               "allocated\nonto habitable land; poverty, vehicle access and ambulatory "
               "difficulty are tract-level and coarser.")
-        _para(fig, 0.745, "The 5% grade is a threshold, and thresholds are a modelling "
+        _para(fig, 0.745, "The 5% grade is a threshold, and thresholds are a modeling "
                           "choice", size=11, weight="bold")
         _para(fig, 0.713,
               f"The mobility profile treats segments steeper than 5% as impassable. Real "
@@ -477,13 +477,13 @@ def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> P
               f"instead of a cutoff, nobody is stranded and the same cohort still faces a "
               f"median\n{st['median_min_no_penalty']:.0f}-minute walk with no slope "
               f"penalty applied at all. The exclusion is structural remoteness\n"
-              f"compounded by terrain, not an artefact of the threshold.")
-        _para(fig, 0.535, "Not modelled", size=11, weight="bold")
+              f"compounded by terrain, not an artifact of the threshold.")
+        _para(fig, 0.535, "Not modeled", size=11, weight="bold")
         _para(fig, 0.503,
               "Sidewalk presence and quality, curb ramps, crossing delay, cross slope "
               "(capped at 2.1% under\nPROWAG and a common real-world failure), transit, "
               "opening hours and branch capacity. Grade is\ntaken from street "
-              "centrelines, not sidewalks. Every one of these omissions pushes the same\n"
+              "centerlines, not sidewalks. Every one of these omissions pushes the same\n"
               "way: the mobility figures here are optimistic.\n\n"
               "Walking speeds are planning defaults, not locally observed. Travel time is "
               "one-way — a downhill\noutbound trip is uphill on the return. Facility sets "

@@ -39,7 +39,7 @@ class Profile:
 # the word "compliant".
 PAR_MAX_GRADE = 0.05
 ADA_RAMP_MAX_GRADE = 0.0833  # ramps and curb ramps only
-ADA_MAX_CROSS_SLOPE = 0.021  # 1:48; not modelled -- no sidewalk cross-slope data
+ADA_MAX_CROSS_SLOPE = 0.021  # 1:48; not modeled -- no sidewalk cross-slope data
 
 PROFILES = [
     Profile("adult", "Adult (planning standard)", 1.34,
@@ -66,7 +66,7 @@ class City:
     state: str
     county: str
     pop_reference: int  # published city population, for validating the raster
-    # Projected CRS in metres. Must match the city's UTM zone -- using Washington's
+    # Projected CRS in meters. Must match the city's UTM zone -- using Washington's
     # zone 10N for Phoenix would distort every distance in the pipeline.
     crs: str = "EPSG:32610"
 
@@ -113,7 +113,7 @@ class Amenity:
 
     `geometry` is the load-bearing field. A library is a door: a point. A park is an area
     you enter at its edge, so collapsing it to a centroid puts the access point hundreds of
-    metres from where anyone actually walks in -- for a 275 ha park that is a bigger error
+    meters from where anyone actually walks in -- for a 275 ha park that is a bigger error
     than the thing being measured.
     """
 
@@ -137,7 +137,7 @@ AMENITIES = {
     "libraries": Amenity(
         key="libraries", noun="library", label="library branches",
         geometry="point", headline_min=15,
-        standard_note="15-minute neighbourhood goal; 3 mph on the flat = 0.75 mi",
+        standard_note="15-minute neighborhood goal; 3 mph on the flat = 0.75 mi",
         sources={
             "seattle": {"kind": "arcgis_service", "service": "Seattle_Public_Library"},
             "tacoma": {"kind": "osm", "tags": {"amenity": "library"},

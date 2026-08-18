@@ -7,7 +7,7 @@ counted as underserved, and — because such places are by construction far from
 middle of Point Defiance Park or the Port of Tacoma.
 
 Only *large* non-residential polygons are excluded. A minimum area threshold keeps
-neighbourhood pocket parks and ballfields from punching holes through genuinely
+neighborhood pocket parks and ballfields from punching holes through genuinely
 residential blocks, while still catching a 300 ha regional park or a working port.
 """
 
@@ -54,7 +54,7 @@ def fetch(city: City) -> gpd.GeoDataFrame:
 
 
 def mask(city: City, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
-    """Boolean grid: True where the cell centre falls in large non-residential land."""
+    """Boolean grid: True where the cell center falls in large non-residential land."""
     g = fetch(city)
     gx, gy = np.meshgrid(xs, ys)
     cells = gpd.GeoDataFrame(

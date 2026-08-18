@@ -1,4 +1,4 @@
-"""City-parameterised siting benchmark: MCLP vs persistent homology vs trivial baselines.
+"""City-parameterized siting benchmark: MCLP vs persistent homology vs trivial baselines.
 
 The question is whether the topological gap-finding this project started from is any use
 for the decision it is supposed to inform -- where the next branch goes. Every strategy
@@ -57,7 +57,7 @@ def masked(s: dict, f: np.ndarray) -> np.ndarray:
 
 def snap_candidate(s: dict, rc, exclude: set) -> int:
     """Snap to the candidate grid by NETWORK distance -- raster adjacency can be
-    kilometres away on foot across a canal, which strands the strategy on one cell."""
+    kilometers away on foot across a canal, which strands the strategy on one cell."""
     dn = dijkstra(s["csr"], indices=[int(s["d"]["cell_node"][rc[0], rc[1]])], min_only=True)  # noqa: E501
     dc = dn[s["cand_nodes"]].copy()
     if exclude:

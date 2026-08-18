@@ -1,6 +1,6 @@
 """The measurement ladder: radius -> network -> terrain -> mobility profile.
 
-The project's original claim was that each modelling step changes the answer. That is only
+The project's original claim was that each modeling step changes the answer. That is only
 demonstrable if the naive baseline is actually computed, so this quantifies the divergence
 rung by rung. Rungs 1-3 hold the population constant, so the differences are attributable
 purely to how access is measured. Rung 4 changes both the model and the population it
@@ -55,7 +55,7 @@ def rungs(city_key: str, amenity_key: str = "libraries") -> list[dict]:
 def main(keys, amenity_key="libraries") -> None:
     for k in keys:
         rs = rungs(k, amenity_key)
-        print(f"\n{'=' * 86}\n{get(k).place.upper()} — how much does each modelling step "
+        print(f"\n{'=' * 86}\n{get(k).place.upper()} — how much does each modeling step "
               f"change the answer?\n{'=' * 86}")
         print(f"{'rung':24s}{'measure':34s}{'underserved':>14s}{'step':>10s}")
         for r in rs:

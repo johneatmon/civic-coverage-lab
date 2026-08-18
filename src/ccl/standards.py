@@ -1,7 +1,7 @@
 """Underserved population by walker profile, time budget, car access — and slope effect.
 
 Now measured in actual travel time rather than a distance proxy, which is what a
-"15 minute neighbourhood" policy literally says. Slope enters through the per-profile
+"15 minute neighborhood" policy literally says. Slope enters through the per-profile
 speed model, and for the mobility profile through ADA-impassable edges.
 """
 
@@ -13,7 +13,7 @@ from ccl.cities import (PAR_MAX_GRADE, PROFILES, TIME_BUDGETS_MIN,
 
 
 def flat_underserved(d, pop_field, threshold_m, metric="network"):
-    """Old distance-based measure: flat metres, no slope."""
+    """Old distance-based measure: flat meters, no slope."""
     mask = d["land"] & np.isfinite(d[metric])
     tot = float(d[pop_field][mask].sum())
     return float(d[pop_field][mask & (d[metric] > threshold_m)].sum()), tot
@@ -40,7 +40,11 @@ def summary(city_key: str, amenity_key: str = "libraries") -> dict:
 
     mask = d["land"]
     out["population"] = float(d["population"][mask].sum())
-    out["grade_steep_pct"] = 100.0 * float((np.abs(d["edge_grade"]) > PAR_MAX_GRADE).mean())
+    # restricted to in-city edges: the graph extends past the boundary so that
+    # cross-boundary destinations are reachable, but this statistic describes the city
+    eic = d["edge_in_city"] if "edge_in_city" in d else np.ones_like(d["edge_grade"], bool)
+    out["grade_steep_pct"] = 100.0 * float(
+        (np.abs(d["edge_grade"][eic]) > PAR_MAX_GRADE).mean())
     out["elev_range"] = (float(np.nanmin(d["node_elev"])), float(np.nanmax(d["node_elev"])))
 
     rows = []

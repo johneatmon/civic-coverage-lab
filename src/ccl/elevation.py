@@ -3,7 +3,7 @@
 3DEP's dynamic ImageServer is public and needs no API key, which keeps the pipeline
 reproducible for anyone cloning the repo.
 
-Speed model: Tobler's hiking function, renormalised so each profile's speed on flat ground
+Speed model: Tobler's hiking function, renormalized so each profile's speed on flat ground
 is its own published flat speed rather than Tobler's 1.4 m/s. Tobler peaks slightly
 downhill (-5% grade), which is the right shape for walking.
 
@@ -30,7 +30,7 @@ SERVICE = ("https://elevation.nationalmap.gov/arcgis/rest/services/"
 TARGET_M = 15.0  # DEM sample spacing
 MAX_PX = 4000  # ImageServer per-request limit
 TILE_PX = 1800  # per-tile request size; the service 500s well below its nominal cap
-TOBLER_FLAT = np.exp(-3.5 * 0.05)  # Tobler's value at zero grade, for renormalising
+TOBLER_FLAT = np.exp(-3.5 * 0.05)  # Tobler's value at zero grade, for renormalizing
 
 
 def _tile(minx, miny, maxx, maxy, w, h, crs_epsg, attempts=6):
@@ -107,7 +107,7 @@ def sample(dem: np.ndarray, transform, xy: np.ndarray) -> np.ndarray:
 
 
 def speed(grade: np.ndarray, flat_mps: float) -> np.ndarray:
-    """Tobler's hiking function renormalised to `flat_mps` at zero grade."""
+    """Tobler's hiking function renormalized to `flat_mps` at zero grade."""
     return flat_mps * np.exp(-3.5 * np.abs(grade + 0.05)) / TOBLER_FLAT
 
 

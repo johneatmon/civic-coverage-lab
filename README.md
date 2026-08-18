@@ -2,7 +2,7 @@
 
 Walking access to civic amenities, measured properly: real street networks, real terrain,
 and separate walker profiles — then benchmarked against classical facility-location
-optimisation to see whether the topology the project started from actually helps.
+optimization to see whether the topology the project started from actually helps.
 
 Case studies: libraries in Seattle (28 branches), Tacoma (8) and Phoenix (17); parks in
 Seattle (254) and Tacoma (66). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
@@ -27,16 +27,16 @@ Everything in this section is re-derived from the current build by
 **changelog** — its numbers are as-of the phase that produced them and several have since
 been superseded. Where the two disagree, this section is right.
 
-> **Data provenance.** Figures were produced on **2026-08-17**. Sources differ in how
+> **Data provenance.** Figures were produced on **2026-08-18**. Sources differ in how
 > stable they are, which is what determines whether a rebuild reproduces them:
 >
 > | source | used for | vintage |
 > |---|---|---|
 > | US Census ACS 5-year | population, age, poverty, vehicle access, ambulatory difficulty | **2023 release — fixed** |
 > | US Census TIGER | block group / tract geometry, water | **2023 release — fixed** |
-> | USGS 3DEP | elevation | accessed 2026-08-17; revised infrequently |
+> | USGS 3DEP | elevation | accessed 2026-08-18; revised infrequently |
 > | Municipal open data | branch locations | accessed 2026-08-17 |
-> | OpenStreetMap | walk network, land use | accessed 2026-08-17 — **live and mutable** |
+> | OpenStreetMap | walk network, land use | accessed 2026-08-18 — **live and mutable** |
 >
 > The Census inputs are versioned releases and will reproduce exactly. OpenStreetMap is
 > edited continuously, so rebuilding shifts these numbers by roughly a point or two — a
@@ -51,12 +51,12 @@ been superseded. Where the two disagree, this section is right.
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
 | library branches | 28 | 8 | 17 |
-| residents analysed | 721,942 | 210,290 | 1,522,291 |
-| residents per branch | 25,784 | 26,286 | **89,547** |
+| residents analyzed | 722,212 | 212,330 | 1,539,333 |
+| residents per branch | 25,793 | 26,541 | **90,549** |
 | median walk to a branch | 19 min | 26 min | **53 min** |
-| adults beyond a 15-min walk | 57.5% | 79.5% | **95.0%** |
-| 65+ beyond a 15-min walk | 75.0% | 89.5% | 97.4% |
-| ambulatory difficulty beyond a 15-min walk | **93.2%** | **95.4%** | **98.5%** |
+| adults beyond a 15-min walk | 57.5% | 79.7% | **95.1%** |
+| 65+ beyond a 15-min walk | 75.0% | 89.6% | 97.4% |
+| ambulatory difficulty beyond a 15-min walk | **92.9%** | **95.6%** | **98.5%** |
 
 ## How you measure changes the answer
 
@@ -65,26 +65,26 @@ fixed; rung 4 changes both the model and the population it applies to.
 
 | rung | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| 1. straight-line radius, 1,206 m | 35.8% | 62.5% | 89.9% |
-| 2. + street network | 55.4% (+19.7) | 79.2% (+16.7) | 95.0% (+5.1) |
-| 3. + terrain | 57.5% (+1.9) | 79.5% (+0.4) | 95.0% (+0.0) |
-| 4. + mobility profile | 93.2% | 95.4% | 98.5% |
-| **straight-line understates by** | **21.7 pts / 155,907** | 17.0 pts / 35,775 | 5.2 pts / 78,795 |
+| 1. straight-line radius, 1,206 m | 35.8% | 62.9% | 90.0% |
+| 2. + street network | 55.5% (+19.7) | 79.4% (+16.5) | 95.1% (+5.1) |
+| 3. + terrain | 57.5% (+2.1) | 79.7% (+0.3) | 95.1% (+0.0) |
+| 4. + mobility profile | 92.9% | 95.6% | 98.5% |
+| **straight-line understates by** | **21.7 pts / 156,927** | 16.8 pts / 35,765 | 5.1 pts / 78,977 |
 
 The network step is large everywhere, including flat gridded Phoenix — a grid forces
 Manhattan travel at ~1.3× straight-line regardless of terrain. Median detour ratio:
-Seattle 1.32, Tacoma 1.35, Phoenix 1.35.
+Seattle 1.32, Tacoma 1.35, Phoenix 1.34.
 
 ## Terrain, and who pays for it
 
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| walk segments steeper than the 5% accessible-route grade | 24.6% | 14.4% | 1.9% |
-| residents with no route to a branch within a 5% grade | **12,484** (46%) | 3,087 (22%) | 1,063 (1.3%) |
+| walk segments steeper than the 5% accessible-route grade | 24.5% | 14.0% | 1.9% |
+| residents with no route to a branch within a 5% grade | **12,288** (45%) | 3,284 (23%) | 1,066 (1%) |
 
 Adding terrain moves the adult figure ~2 points and the ambulatory-difficulty figure ~13.
 Nearly the whole cost of topography falls on one group. The no-route count is
-threshold-sensitive (1,057–19,775 across 4–15% cutoffs in Seattle) and should not be quoted
+threshold-sensitive (846–18,603 across 4–15% cutoffs in Seattle) and should not be quoted
 alone; under a graded penalty instead of a cutoff nobody is stranded, yet the same cohort
 still faces a median 41-minute walk with no slope penalty applied at all.
 
@@ -94,8 +94,8 @@ Households beyond a 15-minute walk:
 
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| no vehicle available | **38.1%** | 72.1% | 92.4% |
-| has a vehicle | **58.6%** | 80.0% | 94.7% |
+| no vehicle available | **38.3%** | 72.3% | 92.4% |
+| has a vehicle | **58.6%** | 80.2% | 94.8% |
 
 Car-free households are *better* served, because they cluster in dense cores where the
 branches already are. The advantage is 20 points in Seattle, 8 in Tacoma and 2 in Phoenix —
@@ -108,24 +108,24 @@ minutes.
 
 | strategy | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| **greedy MCLP** | **+84,183** | **+50,304** | **+86,538** |
-| random (mean of 30 draws) | +33,845 | +21,918 | +24,453 |
-| PH by persistence | +23,096 | +9,333 | +12,462 |
-| PH by population | +16,409 | +22,563 | +7,283 |
-| worst-served point (no topology) | +5,139 | +6,507 | +4,722 |
+| **greedy MCLP** | **+87,779** | **+52,626** | **+86,538** |
+| random (mean of 30 draws) | +33,301 | +21,521 | +27,816 |
+| PH by persistence | +25,014 | +8,624 | +8,508 |
+| PH by population | +16,437 | +16,366 | +1,003 |
+| worst-served point (no topology) | +4,627 | +6,907 | +970 |
 
-Against the full random distribution rather than its mean, PH by persistence beats 6.7% /
-0.0% / 0.0% of 30 draws and PH by population 0.0% / 63.3% / 0.0%. Five of six sit below
-almost every random draw; the sixth sits mid-distribution, which is absence of signal
-rather than a win. MCLP falls outside the random range entirely in all three cities.
+Against the full random distribution rather than its mean, PH by persistence beats 10.0% /
+0.0% / 0.0% of 30 draws and PH by population 0.0% / 10.0% / 0.0%. Every one of the six sits
+below at least 90% of random draws. MCLP falls outside the random range entirely in all
+three cities — Seattle's best of 30 draws was +48,625 against MCLP's +87,779.
 
-**Why:** remoteness is a weak guide to coverage gain (Pearson +0.02 / −0.13 / −0.26) and
+**Why:** remoteness is a weak guide to coverage gain (Pearson +0.01 / −0.16 / −0.27) and
 the extremum these rules target is far worse than the bulk — the most remote site gains
-477 / 66 / 91 residents against pool medians of 3,575 / 2,699 / 2,847, i.e. 13% / 2% / 3%.
+407 / 907 / 117 residents against pool medians of 3,559 / 2,645 / 2,826, i.e. 11% / 34% / 4%.
 
 **Why population weighting does not rescue it:** ranking gaps by population only
 discriminates where there is more than one gap worth ranking. The largest pocket holds
-40.6% of Seattle's underserved but 90.8% of Tacoma's and 98.4% of Phoenix's, so outside
+40.6% of Seattle's underserved but 90.4% of Tacoma's and 98.3% of Phoenix's, so outside
 Seattle the ranking returns the same pocket every time and is not being measured at all.
 
 
@@ -137,29 +137,28 @@ Land campaigns on.
 
 Parks are polygons, and that is load-bearing: you enter a park at its edge. Collapsing one
 to a centroid would put Point Defiance's access point 800 m into the woods. Access nodes are
-therefore every network node inside a park or within 25 m of it — 11,550 of them across
+therefore every network node inside a park or within 25 m of it — 11,555 of them across
 Seattle's 254 parks, against 28 for its 28 libraries.
 
 Seattle uses the city's own parcel-level parks layer, dissolved to 254 parks; Tacoma uses
 **Metro Parks Tacoma's authoritative layer**, filtered to MPT's own analysis set (see the
 validation section below).
 
-Facilities are clipped to the city. An agency's property list can reach well outside it —
-MPT operates **Northwest Trek**, a 288 ha wildlife park 39 km away in Eatonville, plus
-Browns Point and Dash Point in unincorporated Pierce County. Those four contributed *zero*
-access nodes, because the walk graph stops at the city boundary, yet the straight-line
-measure could still see them. That let the crow-flies rung count parks the network rung
-structurally cannot reach — worth only ~0.2 points here, but it is an asymmetry between two
-rungs whose difference is the entire point of the ladder.
+Facilities are clipped to the city plus the same 2 km buffer the walk graph uses, so both
+distance measures see the same set. That matters: an agency's property list can reach far
+outside its city — MPT operates **Northwest Trek**, a 288 ha wildlife park 39 km away in
+Eatonville. Before the buffer existed, such a park contributed *zero* access nodes (the
+graph stopped at the boundary) while the straight-line measure could still see it, letting
+the crow-flies rung count places the network rung structurally could not reach.
 
 | beyond the standard | Seattle libraries (15 min) | Seattle parks (10 min) | Tacoma parks (10 min) |
 |---|---:|---:|---:|
-| adults | 57.4% | **19.6%** | 40.4% |
-| 65+ | 75.1% | 33.9% | 59.9% |
-| ambulatory difficulty | 93.2% | **72.2%** | 76.3% |
-| **mobility gap** (ambulatory − adult) | 36 pts | **53 pts** | 36 pts |
-| no route within a 5% grade | 12,484 | 9,566 | 2,512 |
-| parks | 28 branches | 254 | 66 |
+| adults | 57.5% | **19.6%** | 40.7% |
+| 65+ | 75.0% | 33.8% | 60.2% |
+| ambulatory difficulty | 92.9% | **71.5%** | 76.0% |
+| **mobility gap** (ambulatory − adult) | 35 pts | **52 pts** | 35 pts |
+| no route within a 5% grade | 12,288 | 9,576 | 2,502 |
+| facilities | 28 branches | 254 | 66 |
 
 Parks are far better distributed than libraries — a fifth of Seattle adults are beyond a
 10-minute walk to a park against well over half for a 15-minute walk to a library. **But the
@@ -169,8 +168,8 @@ mobility gap is much wider**, 53 points against 36.
 
 | mean walk-segment grade | city-wide | near libraries | near parks |
 |---|---:|---:|---:|
-| Seattle | 3.9% | **3.0%** | **4.7%** |
-| Tacoma | 2.6% | 2.6% | **2.9%** |
+| Seattle | 3.9% | **3.0%** | **4.6%** |
+| Tacoma | 2.5% | 2.6% | 2.8% |
 
 A library is a building, and buildings go where building is cheap — Seattle's branches sit
 on land *flatter* than the city average. Parkland is disproportionately what was left over:
@@ -195,28 +194,27 @@ agency's own work rather than against plausibility.
 
 Tacoma parks now use MPT's authoritative layer, filtered to their own analysis set
 (`Anlyss_Lyr > 0` — their Neighborhood, Community, Regional and Natural Area tiers), so both
-analyses cover the same 72 parks against the same standard.
+analyzes cover the same 72 parks against the same standard.
 
 **Their published walkshed is a straight-line buffer, not a network walkshed.** The evidence
 is geometric:
 
 | construction, same 72 parks | area |
 |---|---:|
-| network, 804 m | 63.2 km² |
-| network, 804 m, all 84 MPT properties | 65.8 km² |
-| **straight-line, 804 m** | **89.0 km²** |
+| network, 804 m | 62.8 km² |
+| **straight-line, 804 m** | **88.6 km²** |
 | **MPT published walkshed** | **89.4 km²** |
 
-The straight-line buffer matches their published figure to **0.4%**. No network construction
-comes within 25 km², including one using every MPT property rather than the analysis set.
+The straight-line buffer matches their published figure to **0.9%**. No network construction
+comes within 26 km², including one using every MPT property rather than the analysis set.
 
 ### What that costs
 
 | Tacoma, 10-minute park standard | straight-line | network + terrain | overstated by |
 |---|---:|---:|---:|
-| adults | 80.6% | **59.6%** | 21.0 pts (44,184 people) |
-| 65+ | 62.6% | **40.1%** | 22.5 pts (6,843) |
-| ambulatory difficulty | 52.1% | **23.7%** | 28.4 pts (3,953) |
+| adults | 79.9% | **59.3%** | 20.6 pts (43,873 people) |
+| 65+ | 62.1% | **39.8%** | 22.4 pts (6,884) |
+| ambulatory difficulty | 51.8% | **24.0%** | 27.8 pts (3,899) |
 
 A straight-line buffer is standard practice, not an error — it is exactly rung 1 of the
 measurement ladder, and the Trust for Public Land's own ParkServe uses network walksheds
@@ -225,7 +223,7 @@ access figure overstates it by 21 points for adults and 28 for residents with an
 difficulty**, and the overstatement is largest for the group least able to absorb it.
 
 This is also the closest thing the project has to external validation. Two independent
-implementations of the same standard on the same parks agree to 0.4% on area once the
+implementations of the same standard on the same parks agree to 0.9% on area once the
 *method* is matched — which is evidence the pipeline is sound, and that the disagreement is
 about measurement choice rather than execution.
 
@@ -233,7 +231,7 @@ about measurement choice rather than execution.
 
 UW Taskar Center's **Walkshed** does planner-facing pedestrian accessibility on
 **OS-CONNECT**, a statewide sidewalk network with curb ramps and crossings. On network
-fidelity in Washington they win outright; anything built on street centrelines is a proxy.
+fidelity in Washington they win outright; anything built on street centerlines is a proxy.
 The differentiators here are the per-profile decomposition with its own population
 denominators, the siting benchmark, and portability — OS-CONNECT is Washington-only, and
 this pipeline ran Phoenix by changing a UTM zone and a county FIPS. Swapping OS-CONNECT in
@@ -243,10 +241,11 @@ for the Washington cities is the obvious v2.
 
 Sidewalk presence and quality, curb ramps, crossing delay, cross slope (2.1% under PROWAG,
 a common real-world failure), transit, opening hours and branch capacity are all unmodelled.
-The walk graph stops at the city boundary, so a genuinely walkable destination just across
-the line is invisible to every rung — consistent between them, but it understates access at
-the city edge.
-Grade comes from street centrelines, not sidewalks. Every one of those omissions pushes the
+The walk graph now extends 2 km past the city line, so a destination just outside is
+reachable; the facility set is clipped to the same buffer so both distance measures see
+the same places. What remains missing is facilities operated by *other* agencies just over
+the line — a county library or a neighboring city's park is in nobody's source list here.
+Grade comes from street centerlines, not sidewalks. Every one of those omissions pushes the
 same way: the mobility figures here are optimistic. Walking speeds are planning defaults,
 not locally observed; travel time is one-way.
 
@@ -350,7 +349,7 @@ People brought within the 1,200 m standard by 8 new branches:
 
 **Every PH variant loses to random placement.** The mechanism is not subtle: persistence
 points at the *most remote* location, and the most remote location is by definition where
-the fewest people live. Maximising distance is close to the opposite of maximising
+the fewest people live. maximizing distance is close to the opposite of maximizing
 coverage.
 
 ### Testing PH on an objective it should suit
@@ -399,7 +398,7 @@ the framing:
   Tacoma have library service-area maps built this way. The novel part is the *count of
   people outside the service area*, not the distance calculation.
 - Agencies set their own standards — Metro Parks Tacoma uses a 10-minute walk.
-- Tacoma's most recent Comprehensive Plan adopts the **15-minute neighbourhood** goal, and
+- Tacoma's most recent Comprehensive Plan adopts the **15-minute neighborhood** goal, and
   **0.75 mi (1,207 m)** is the defensible operational threshold; 0.5 mi is the alternative
   if you are explicitly accounting for all ages and abilities.
 
@@ -482,12 +481,12 @@ population-per-branch ratio (26.1k vs 25.7k): **20.4% of Tacoma residents are wi
 
 ### Slope's real effect is passability, not speed
 
-Travel time now uses Tobler's hiking function renormalised to each profile's flat speed,
+Travel time now uses Tobler's hiking function renormalized to each profile's flat speed,
 over USGS 3DEP elevation (public, no API key). The mobility profile additionally treats
 segments steeper than the **ADA 8.33% maximum running slope** as impassable rather than
 merely slow — above that grade a route is not hard, it is unusable.
 
-Standards are now expressed in actual travel time, which is what "15-minute neighbourhood"
+Standards are now expressed in actual travel time, which is what "15-minute neighborhood"
 literally says, rather than a distance proxy.
 
 | | Seattle | Tacoma |
@@ -522,7 +521,7 @@ uv run python -m ccl.report seattle tacoma
 > **Superseded threshold.** The sensitivity structure holds, but it is centred on
 > 8.33%; phase 9 re-centres it on 5%.
 
-Treating a segment above 8.33% as impassable is a modelling choice, so it was stress-tested
+Treating a segment above 8.33% as impassable is a modeling choice, so it was stress-tested
 two ways: the threshold, and the model form.
 
 ### The "no route" count is fragile
@@ -557,7 +556,7 @@ with **no slope penalty at all** — the most generous assumption possible:
 | p90 | 77 min | 133 min |
 | already over 60 min | 18% | 33% |
 
-These are not people stranded by a modelling artifact. They are in genuinely remote places
+These are not people stranded by a modeling artifact. They are in genuinely remote places
 before slope is considered at all — a 43-minute median walk under assumptions that ignore
 terrain entirely. **Slope is a second-order effect layered on an already severe access
 deficit.**
@@ -663,7 +662,7 @@ port, cemetery, military, quarry, airfield — above a 2 ha threshold, so pocket
 punch holes through residential blocks) now define uninhabitable land. Each census unit's
 count is spread over its *habitable* area only, at a density derived from its habitable
 fraction — which conserves the unit total and keeps units straddling the city boundary
-proportional. Getting that normalisation right took two attempts: dividing by a count of
+proportional. Getting that normalization right took two attempts: dividing by a count of
 in-grid habitable cells dumped each straddling unit's whole population inside the city
 line (Seattle +10.4% against published), and measuring the habitable fraction on a domain
 that included the boundary and network-distance conditions deflated it the other way.
@@ -674,7 +673,7 @@ restricted to habitable land — which is also consistent with phase 3's finding
 the right siting engine. Pockets themselves are cut over habitable land, so parks and port
 terminals are no longer shaded as underserved at all.
 
-Top sites now resolve to real neighbourhoods: Greenwood, Alaska Junction, Uptown and
+Top sites now resolve to real neighborhoods: Greenwood, Alaska Junction, Uptown and
 Rainier Valley in Seattle; Hilltop, Northeast Tacoma and Linden Lane in Tacoma.
 
 ### What it changed, and what it did not
@@ -704,7 +703,7 @@ ramp and picks up handrails, landings, edge protection and rise limits. PROWAG R
 sets the same 5% ceiling on a pedestrian access route in the right-of-way. 1:12 appears in
 PROWAG only for **curb ramps** (R304.2.1). Cross slope is capped at 1:48 (2.1%) — a real
 constraint this does not model at all, since sidewalk cross slope is not derivable from a
-street-centreline DEM.
+street-centerline DEM.
 
 PROWAG grants one important exception: where the adjacent street exceeds 5%, the route may
 match the street's grade. So a sidewalk up a steep hill can be entirely compliant — which
@@ -790,7 +789,7 @@ In Seattle, population weighting does worse (+16,409 vs +25,037) and not for the
 reason: it selects the **largest** pockets (median pocket population 168,663 vs 67,639),
 not small dense ones. It ranks the region correctly, then still places at the worst-served
 point inside it — a larger region has a more extreme extremum, so it picks a better
-neighbourhood and a worse corner of it.
+neighborhood and a worse corner of it.
 
 That flips in Tacoma (+8,550 vs +3,363), because the ranking is degenerate there:
 
@@ -833,7 +832,7 @@ estimate.
 UW's Taskar Center already does planner-facing pedestrian accessibility analysis —
 **Walkshed** — and runs it on **OS-CONNECT**, a statewide sidewalk network with curb ramps
 and crossings. On network fidelity in Washington they win outright; anything on street
-centrelines is a proxy. The differentiators here are the per-profile decomposition with its
+centerlines is a proxy. The differentiators here are the per-profile decomposition with its
 own population denominators, the siting benchmark, and portability: OS-CONNECT is
 Washington-only, and this pipeline ran Phoenix by changing a UTM zone and a county FIPS.
 Swapping in OS-CONNECT for the Washington cities is the obvious v2.
@@ -861,18 +860,18 @@ attributable to the metric, not the pipeline.
 Network distances come from one multi-source Dijkstra over the OSM walk graph seeded at
 every facility node — nearest-facility distance for all nodes in a single pass.
 
-Holes are localised at the **death** cell. The birth cell is the saddle where the loop
+Holes are localized at the **death** cell. The birth cell is the saddle where the loop
 closes and sits on the void's rim; the death cell is the last point the sublevel set
 reaches — the most underserved point, and where you would site a facility. Verified
 against a synthetic ring (8 points, radius 30): death value 30.0, death cell exactly the
-centre.
+center.
 
 ## Three traps this hit
 
 **`retain_all=False` silently deleted a quarter of Seattle.** `osmnx.graph_from_polygon`
 defaults to keeping only the largest connected component, and Seattle's walk network is
 not connected — West Seattle attaches only via bridges whose pedestrian ways are not
-continuously tagged. Five library branches vanished. Fixing it moved the analysed area
+continuously tagged. Five library branches vanished. Fixing it moved the analyzed area
 from 194 km² to 226 km² (Seattle land ≈ 217 km²) and strengthened the headline result.
 
 **The Census API returns 200 OK with all-null values for the wrong geography.** B17001
@@ -883,7 +882,7 @@ passes and the data is silently zero. Those two now fall back to tract resolutio
 
 **Snapping a recommendation by grid-index distance silently breaks the siting loop.**
 All strategies must place on a shared candidate grid, and the obvious snap is nearest
-cell in raster coordinates — but across a canal that neighbour is kilometres away on
+cell in raster coordinates — but across a canal that neighbour is kilometers away on
 foot. The placed facility then fails to cover the point it was meant to serve, the same
 cell stays worst-served, and the strategy re-picks it forever (the control collapsed to
 2 distinct sites out of 8). Snapping now uses network distance and forbids repeats.
@@ -896,10 +895,10 @@ what it uniquely offers (enclosed vs. edge), not for extent.
 
 ## Known limitations
 
-- **Sidewalk quality is not modelled.** Slope is, but curb ramps, surface condition,
+- **Sidewalk quality is not modeled.** Slope is, but curb ramps, surface condition,
   crossing delay and missing sidewalks are not — so the mobility figures stay optimistic
   even with the ADA grade cutoff applied.
-- **Grade comes from the street centreline**, not the sidewalk, and a DEM sampled at 15 m
+- **Grade comes from the street centerline**, not the sidewalk, and a DEM sampled at 15 m
   smooths short steep pitches.
 - **Travel time is one-way.** A downhill outbound trip is uphill on the return.
 - **Walking speeds are literature defaults, not measured.** The profile speeds are
@@ -951,7 +950,7 @@ its UTM zone, and where the facility points come from.
 | `landuse` | OSM mask of large non-residential land, for dasymetric allocation |
 | `standards` | underserved counts by profile, time budget and car access |
 | `ladder` | the radius → network → terrain → profile comparison |
-| `persistence` | H1 of a sublevel-set filtration, localised at death cells |
+| `persistence` | H1 of a sublevel-set filtration, localized at death cells |
 | `bench` | siting strategies and their scoring |
 | `sensitivity` | how much the grade threshold is doing |
 | `report` | the per-city PDF |

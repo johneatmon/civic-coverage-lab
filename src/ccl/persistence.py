@@ -9,17 +9,17 @@ a different metric, which is what the siting benchmark compares against.
 import gudhi
 import numpy as np
 
-MIN_PERSISTENCE_M = 300.0  # below ~2 grid cells the bars are discretisation noise
+MIN_PERSISTENCE_M = 300.0  # below ~2 grid cells the bars are discretization noise
 
 
 def h1_diagram(field: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return (bars[n,2], death_cells[n,2]) for H1, sorted by decreasing persistence.
 
-    Localisation uses the *death* cell, not the birth cell. The birth cell is the saddle
+    Localization uses the *death* cell, not the birth cell. The birth cell is the saddle
     where the loop closes up, which sits on the rim of the void; the death cell is the last
     point the sublevel set reaches -- the most underserved point, and where you would site
     a facility. Verified against a synthetic ring of 8 points at radius 30: death value
-    30.0, death cell exactly the centre.
+    30.0, death cell exactly the center.
     """
     cc = gudhi.CubicalComplex(top_dimensional_cells=field)
     cc.compute_persistence()

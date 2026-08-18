@@ -19,18 +19,18 @@ D = {c: load(c) for c in CITIES}
 
 print("BENCHMARK TABLE")
 claims = {
- "MCLP greedy": [84183, 50304, 86538],
- "PH by persistence": [23096, 9333, 12462],
- "PH by population": [16409, 22563, 7283],
- "worst-point (no topology)": [5139, 6507, 4722],
+ "MCLP greedy": [87779, 52626, 86538],
+ "PH by persistence": [25014, 8624, 8508],
+ "PH by population": [16437, 16366, 1003],
+ "worst-point (no topology)": [4627, 6907, 970],
 }
 for nm, vals in claims.items():
     for c, v in zip(CITIES, vals):
         chk(f"{nm[:20]} {c}", v, R[c]["rows"][nm]["covered"] - R[c]["base"]["covered"], 1)
 
 print("\nRANDOM: 30 draws (mean, and % of draws each PH beats)")
-rand_claims = {"seattle": 33845, "tacoma": 21918, "phoenix": 24453}
-pct_claims = {"seattle": (6.7, 0.0), "tacoma": (0.0, 63.3), "phoenix": (0.0, 0.0)}
+rand_claims = {"seattle": 33301, "tacoma": 21521, "phoenix": 27816}
+pct_claims = {"seattle": (10.0, 0.0), "tacoma": (0.0, 10.0), "phoenix": (0.0, 0.0)}
 best_seattle = None
 for c in CITIES:
     s, std, base = R[c]["s"], R[c]["standard"], R[c]["base"]["covered"]
@@ -40,12 +40,12 @@ for c in CITIES:
     for nm, cl in zip(["PH by persistence", "PH by population"], pct_claims[c]):
         v = R[c]["rows"][nm]["covered"] - base
         chk(f"{nm[:17]} pctile {c}", cl, 100.0 * (dr < v).mean(), 0.1)
-chk("Seattle best of 30 random draws", 49921, best_seattle, 1)
+chk("Seattle best of 30 random draws", 48625, best_seattle, 1)
 
 print("\nMECHANISM: correlations, median gains, worst-point gain")
-corr = {"seattle": (0.02, 0.19), "tacoma": (-0.13, -0.02), "phoenix": (-0.26, -0.25)}
-med = {"seattle": 3575, "tacoma": 2699, "phoenix": 2847}
-wp = {"seattle": 477, "tacoma": 66, "phoenix": 91}
+corr = {"seattle": (0.01, 0.19), "tacoma": (-0.16, -0.05), "phoenix": (-0.27, -0.26)}
+med = {"seattle": 3559, "tacoma": 2645, "phoenix": 2826}
+wp = {"seattle": 407, "tacoma": 907, "phoenix": 117}
 for c in CITIES:
     s, d, cov, std = R[c]["s"], D[c], R[c]["cov"], R[c]["standard"]
     base = field_from(s, d["fac_nodes"])
@@ -61,7 +61,7 @@ for c in CITIES:
         np.median(gain[R[c]["picks"]["worst-point (no topology)"]]), 1)
 
 print("\nPOCKET STRUCTURE")
-shares = {"seattle": 40.6, "tacoma": 90.8, "phoenix": 98.4}
+shares = {"seattle": 40.6, "tacoma": 90.4, "phoenix": 98.3}
 for c in CITIES:
     s, d, std = R[c]["s"], D[c], R[c]["standard"]
     base = field_from(s, d["fac_nodes"])
@@ -77,37 +77,37 @@ for c in CITIES:
 
 print("\nLADDER (Seattle)")
 rs = rungs("seattle")
-for i, cl in enumerate([35.8, 55.4, 57.5, 93.2]):
+for i, cl in enumerate([35.8, 55.5, 57.5, 92.9]):
     chk(f"rung {i+1} pct", cl, rs[i]["pct"], 0.05)
 chk("network step pp", 19.7, rs[1]["pct"]-rs[0]["pct"], 0.05)
-chk("terrain step pp", 1.93, rs[2]["pct"]-rs[1]["pct"], 0.05)
+chk("terrain step pp", 2.06, rs[2]["pct"]-rs[1]["pct"], 0.05)
 chk("radius understates, points", 21.7, rs[2]["pct"]-rs[0]["pct"], 0.05)
-chk("radius understates, people", 155907, rs[2]["n"]-rs[0]["n"], 5)
+chk("radius understates, people", 156927, rs[2]["n"]-rs[0]["n"], 5)
 
 print("\nPROFILES + SLOPE + GRADE EXCLUSION (Seattle)")
 d = D["seattle"]; m = d["land"]
 for p, cl in zip(PROFILES, [1206, 900, 720]):
     chk(f"{p.key} 15-min distance m", cl, distance_m(p, 15), 1)
-for p, cl in zip(PROFILES, [57.5, 75.0, 93.2]):
+for p, cl in zip(PROFILES, [57.5, 75.0, 92.9]):
     tot = d[p.pop_field][m].sum()
     chk(f"{p.key} beyond 15 min pct", cl,
         100*d[p.pop_field][m & ~(d[f'time_{p.key}'] <= 900)].sum()/tot, 0.05)
 adult, mob = PROFILES[0], PROFILES[2]
-for p, cl in [(adult, 1.93), (mob, 13.03)]:
+for p, cl in [(adult, 2.06), (mob, 12.7)]:
     tot = d[p.pop_field][m].sum()
     with_s = 100*d[p.pop_field][m & ~(d[f'time_{p.key}'] <= 900)].sum()/tot
     flat = 100*d[p.pop_field][m & (d["network"] > distance_m(p, 15))].sum()/tot
     chk(f"slope cost {p.key} (pp)", cl, with_s - flat, 0.3)
 st = stranded_profile("seattle")
-chk("no route within 5% grade", 12484, st["count"], 5)
-chk("  as pct of group", 46.0, 100*st["count"]/d["pop_ambulatory"][m].sum(), 0.5)
-chk("threshold range low", 1057, st["range"][0], 5)
-chk("threshold range high", 19775, st["range"][1], 5)
+chk("no route within 5% grade", 12288, st["count"], 5)
+chk("  as pct of group", 44.8, 100*st["count"]/d["pop_ambulatory"][m].sum(), 0.5)
+chk("threshold range low", 846, st["range"][0], 5)
+chk("threshold range high", 18603, st["range"][1], 5)
 chk("median walk, no slope penalty", 41, st["median_min_no_penalty"], 0.5)
 chk("pct over 60 min, no penalty", 10, st["pct_over_60_no_penalty"], 0.6)
 
 print("\nDETOUR RATIOS")
-for c, cl in [("seattle", 1.32), ("phoenix", 1.35)]:
+for c, cl in [("seattle", 1.32), ("phoenix", 1.34)]:
     d = D[c]; mm = d["land"] & np.isfinite(d["network"]) & np.isfinite(d["euclidean"])
     r = d["network"][mm]/np.maximum(d["euclidean"][mm], 1)
     w = d["population"][mm]; o = np.argsort(r)

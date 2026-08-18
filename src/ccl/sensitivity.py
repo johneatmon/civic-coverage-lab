@@ -6,8 +6,8 @@ Two separate questions, and they are not equally important:
    grade below has a real meaning: 1:20 is the accessible-route/PAR limit, 1:12 is the
    maximum for a ramp or curb ramp, and the steeper rows approximate what PROWAG's
    adjacent-street exception effectively permits on a hillside sidewalk.
-2. Model form — treating a steep segment as *impassable* is a modelling choice. Real
-   routes have switchbacks, and street centreline grade is not sidewalk grade. Under a
+2. Model form — treating a steep segment as *impassable* is a modeling choice. Real
+   routes have switchbacks, and street centerline grade is not sidewalk grade. Under a
    soft penalty nobody is stranded; they just face a longer trip. The question that
    actually matters is how long that trip is. If the "stranded" cohort faces 25 minutes
    under a soft model, the hard cutoff is overstating the finding. If they face 90, the
@@ -48,7 +48,7 @@ def time_field(d, csr, coo, flat_mps, max_grade, penalty=np.inf):
     return np.where(d["land"], tn[d["cell_node"]] + d["snap"] / flat_mps, np.inf)
 
 
-def analyse(city_key: str, amenity_key: str = "libraries") -> None:
+def analyze(city_key: str, amenity_key: str = "libraries") -> None:
     city, d = get(city_key), load(city_key, amenity_key)
     budget = get_amenity(amenity_key).headline_min * 60.0
     csr = csr_matrix((d["csr_data"], d["csr_indices"], d["csr_indptr"]),
@@ -163,4 +163,4 @@ if __name__ == "__main__":
     if args and args[0] in ("libraries", "parks"):
         amen, args = args[0], args[1:]
     for k in args:
-        analyse(k, amen)
+        analyze(k, amen)

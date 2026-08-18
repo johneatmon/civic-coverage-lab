@@ -1,4 +1,4 @@
-"""City-parameterised pipeline: facilities, walk network, travel-time fields, demand rasters.
+"""City-parameterized pipeline: facilities, walk network, travel-time fields, demand rasters.
 
 One entry point per city. `build(key)` fetches everything, models it and writes a single
 `data/city_<key>.npz` that every downstream module reads.
@@ -30,6 +30,11 @@ CRS_M = "EPSG:32610"  # default only; each city carries its own UTM zone
 GRID_M = 150
 SNAP_MAX_M = 250.0
 ACCESS_BUFFER_M = 25.0  # a perimeter sidewalk counts as being at the park
+# The walk graph extends past the city line so a destination just outside is reachable.
+# Without it the network measure stops dead at the boundary while the straight-line
+# measure does not, which biases the very comparison the ladder exists to make. 2 km is
+# comfortably beyond the longest standard used here (1,206 m).
+GRAPH_BUFFER_M = 2000.0
 MIN_DENSITY = 100.0
 ACS_YEAR = 2023
 
@@ -118,13 +123,15 @@ def fetch_facilities(city: City, am: Amenity) -> gpd.GeoDataFrame:
         gdf = gdf[([name] if name else []) + ["geometry"]].reset_index(drop=True)
         gdf = gdf.to_crs("EPSG:4326")
 
-    # Keep only facilities that touch the city. An agency's property list can include
+    # Keep facilities within walking reach of the city -- the boundary plus the same
+    # buffer the walk graph uses, so both distance measures see the same set. An
+    # agency's property list can include
     # holdings far outside it -- Metro Parks Tacoma operates Northwest Trek, a 288 ha
     # wildlife park 39 km away in Eatonville. Such a facility contributes no access nodes,
     # because the walk graph stops at the city boundary, but it *is* visible to the
     # straight-line measure, which would let the crow-flies rung count facilities the
     # network rung structurally cannot reach.
-    poly = boundary(city).to_crs(city.crs).union_all()
+    poly = boundary(city).to_crs(city.crs).buffer(GRAPH_BUFFER_M).union_all()
     gm = gdf.to_crs(city.crs)
     keep_mask = gm.geometry.intersects(poly)
     if (~keep_mask).any():
@@ -183,13 +190,15 @@ def boundary(city: City) -> gpd.GeoDataFrame:
 
 
 def walk_graph(city: City) -> nx.MultiDiGraph:
-    c = DATA / f"{city.key}_walk.graphml"
+    c = DATA / f"{city.key}_walk_b{int(GRAPH_BUFFER_M)}.graphml"
     if not c.exists():
         # retain_all=True is essential: a city's walk network is generally NOT one
         # connected component (Seattle's West Seattle attaches only via bridges whose
         # pedestrian ways are not continuously tagged), and the default silently
         # deletes everything outside the largest component.
-        G = ox.graph_from_polygon(boundary(city).union_all(), network_type="walk",
+        poly = (boundary(city).to_crs(city.crs).buffer(GRAPH_BUFFER_M)
+                .to_crs("EPSG:4326").union_all())
+        G = ox.graph_from_polygon(poly, network_type="walk",
                                   simplify=True, retain_all=True)
         ox.save_graphml(G, c)
     return ox.load_graphml(c)
@@ -259,7 +268,7 @@ def _water(city: City) -> gpd.GeoDataFrame:
 def demand_rasters(city: City, xs, ys, alloc: np.ndarray | None = None,
                    water: np.ndarray | None = None,
                    nonres: np.ndarray | None = None) -> dict:
-    """Rasterise ACS counts, allocated dasymetrically onto habitable land.
+    """Rasterize ACS counts, allocated dasymetrically onto habitable land.
 
     Spreading a block group's population evenly over its whole area puts phantom
     residents in its parks, ports and airfields -- which then register as underserved
@@ -313,7 +322,7 @@ def demand_rasters(city: City, xs, ys, alloc: np.ndarray | None = None,
 
         # Habitable fraction of each unit, estimated from the grid sample, applied to its
         # true land area. Density stays a per-unit constant, so a block group straddling
-        # the city boundary contributes only its in-city share -- normalising by a count
+        # the city boundary contributes only its in-city share -- normalizing by a count
         # of in-grid cells instead would dump its whole population inside the line.
         hab = np.bincount(ui[valid & hab_all], minlength=nunits)
         allc = np.bincount(ui[valid & land_all], minlength=nunits)
@@ -365,7 +374,7 @@ def build(city_key: str, amenity_key: str = "libraries") -> dict:
 
     fac_nodes = access_nodes(fac, am, node_xy, tree, city.crs)
 
-    # Flat-distance fields (metres), kept so the slope effect can be isolated.
+    # Flat-distance fields (meters), kept so the slope effect can be isolated.
     # Transposed: a path from a facility in the reversed graph is a path *to* it in the
     # original, which is the direction accessibility is defined in.
     dn = dijkstra(csr.T.tocsr(), indices=fac_nodes, min_only=True)
@@ -373,10 +382,20 @@ def build(city_key: str, amenity_key: str = "libraries") -> dict:
     euclid = straight_line_field(fac, am, xs, ys, city.crs)
 
     # Slope-aware travel time (seconds), one field per walker profile.
-    dem, transform = fetch_dem(city.key, tuple(boundary(city).to_crs(city.crs).total_bounds),
+    # The DEM has to span the buffered graph, not just the city: sample() clamps to the
+    # raster edge, so a node in the buffer zone would otherwise take the elevation of the
+    # nearest city-edge pixel and get a fabricated grade.
+    dem_bounds = tuple(boundary(city).to_crs(city.crs).buffer(GRAPH_BUFFER_M).total_bounds)
+    dem, transform = fetch_dem(f"{city.key}_b{int(GRAPH_BUFFER_M)}", dem_bounds,
                                crs_epsg=int(city.crs.split(":")[1]))
     elev = sample(dem, transform, node_xy)
     elev = np.where(np.isnan(elev), np.nanmedian(elev), elev)
+
+    # Which graph nodes lie inside the city itself. The graph now extends GRAPH_BUFFER_M
+    # past the line so cross-boundary destinations are reachable, but descriptive terrain
+    # statistics should still describe the city rather than the buffer zone.
+    _npts = gpd.GeoSeries(gpd.points_from_xy(node_xy[:, 0], node_xy[:, 1]), crs=city.crs)
+    node_in_city = _npts.within(boundary(city).to_crs(city.crs).union_all()).to_numpy()
 
     coo = csr.tocoo()
     length = coo.data
@@ -390,7 +409,7 @@ def build(city_key: str, amenity_key: str = "libraries") -> dict:
         keep = np.isfinite(secs)
         tm = csr_matrix((secs[keep], (coo.row[keep], coo.col[keep])), shape=csr.shape)
         tn = dijkstra(tm.T.tocsr(), indices=fac_nodes, min_only=True)
-        # walking from the cell centre to the network, at the profile's flat speed
+        # walking from the cell center to the network, at the profile's flat speed
         time_fields[f"time_{p.key}"] = tn[cell_node] + snap / p.speed_mps
         impassable[p.key] = float((~keep).sum()) / len(secs)
 
@@ -415,6 +434,7 @@ def build(city_key: str, amenity_key: str = "libraries") -> dict:
         "n_facilities": np.array(len(fac)),
         "csr_data": csr.data, "csr_indices": csr.indices, "csr_indptr": csr.indptr,
         "csr_shape": np.array(csr.shape), "node_elev": elev, "edge_grade": grade,
+        "node_in_city": node_in_city, "edge_in_city": node_in_city[coo.row],
         **time_fields,
         **{k: v for k, v in dem_r.items()},
     }
@@ -441,7 +461,7 @@ if __name__ == "__main__":
         print(f"\n=== {c.place} — {r['amenity'].label} ===")
         print(f"  facilities        : {r['n_facilities']} "
               f"({r['n_access_nodes']:,} access nodes)")
-        print(f"  analysed land     : {land.sum() * 0.0225:,.0f} km2 ({land.sum():,} cells)")
+        print(f"  analyzed land     : {land.sum() * 0.0225:,.0f} km2 ({land.sum():,} cells)")
         print(f"  population (raster): {pop:,.0f}  vs published {c.pop_reference:,} "
               f"({100 * pop / c.pop_reference - 100:+.1f}%)")
         print(f"  65+               : {r['pop_65plus'][land].sum():,.0f}")
@@ -453,7 +473,9 @@ if __name__ == "__main__":
               f"max {n[np.isfinite(n)].max():,.0f} m")
         print(f"  elevation         : {np.nanmin(r['node_elev']):.0f}-"
               f"{np.nanmax(r['node_elev']):.0f} m; "
-              f"|grade|>5% on {100 * (np.abs(r['edge_grade']) > 0.05).mean():.1f}% of edges")
+              f"|grade|>5% on "
+              f"{100 * (np.abs(r['edge_grade'][r['edge_in_city']]) > 0.05).mean():.1f}% "
+              f"of in-city edges")
         for p in PROFILES:
             tf = r[f"time_{p.key}"][inh] / 60.0
             ok = np.isfinite(tf)
