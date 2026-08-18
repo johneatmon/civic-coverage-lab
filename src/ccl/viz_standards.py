@@ -7,7 +7,7 @@ import numpy as np
 
 from ccl.build import load
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, distance_m, get
-from ccl.standards import underserved
+from ccl.standards import time_underserved
 
 OUT = Path(__file__).resolve().parents[2] / "out"
 COLORS = {10: "#e4572e", 15: "#f5b841"}
@@ -25,7 +25,7 @@ def plot(city_keys=("seattle", "tacoma")) -> Path:
         for i, minutes in enumerate(TIME_BUDGETS_MIN):
             pct, labels = [], []
             for p in PROFILES:
-                b, t = underserved(d, "network", p.pop_field, distance_m(p, minutes))
+                b, t, _ = time_underserved(d, p, minutes)
                 pct.append(100 * b / t)
                 labels.append(f"{b:,.0f}")
             off = (i - 0.5) * h
@@ -44,10 +44,8 @@ def plot(city_keys=("seattle", "tacoma")) -> Path:
         ax.invert_yaxis()
         ax.set_xlim(0, 100)
         ax.set_xlabel("% of that group beyond a walk to the nearest library")
-        cov = 100 * (1 - underserved(d, "network", "population",
-                                     distance_m(PROFILES[0], 15))[0]
-                     / underserved(d, "network", "population",
-                                   distance_m(PROFILES[0], 15))[1])
+        b15, t15, _ = time_underserved(d, PROFILES[0], 15)
+        cov = 100 * (1 - b15 / t15)
         ax.set_title(f"{city.place.split(',')[0]} — {int(d['fac_nodes'].size)} branches\n"
                      f"{cov:.0f}% of adults meet the 15-minute standard", fontsize=12)
         ax.grid(axis="x", alpha=0.25)

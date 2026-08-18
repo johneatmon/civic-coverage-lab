@@ -186,3 +186,9 @@ uv run python -m ccl.report seattle tacoma phoenix
 
 Eight pages per city. Public data only: OpenStreetMap, Census ACS and TIGER, USGS 3DEP,
 municipal open data.
+
+---
+
+Every figure above is re-derived from a fresh run by
+[`scripts/verify_writeup.py`](scripts/verify_writeup.py) — 63 assertions, all passing
+against the current build.

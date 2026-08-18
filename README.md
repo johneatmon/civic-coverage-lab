@@ -267,7 +267,7 @@ walker-profile breakdown, the slope/ADA page, underserved pockets with populatio
 and the siting benchmark, with methods and caveats stated on the page.
 
 ```bash
-PYTHONPATH=src uv run python -m ccl.report seattle tacoma
+uv run python -m ccl.report seattle tacoma
 ```
 
 
@@ -678,11 +678,11 @@ uv run python src/ccl/fetch.py               # Seattle City GIS facility layers
 uv run python src/ccl/fields.py libraries    # both distance fields (~1 min)
 uv run python src/ccl/demand.py              # ACS + TIGER water rasters
 uv run python src/ccl/persistence.py libraries
-PYTHONPATH=src uv run python -m ccl.rank libraries
-PYTHONPATH=src uv run python -m ccl.viz libraries
-PYTHONPATH=src uv run python -m ccl.viz_demand libraries
-PYTHONPATH=src uv run python -m ccl.mclp libraries        # siting benchmark
-PYTHONPATH=src uv run python -m ccl.objectives libraries  # multi-objective comparison
+uv run python -m ccl.rank libraries
+uv run python -m ccl.viz libraries
+uv run python -m ccl.viz_demand libraries
+uv run python -m ccl.mclp libraries        # siting benchmark
+uv run python -m ccl.objectives libraries  # multi-objective comparison
 ```
 
 Needs `CENSUS_DATA_API_KEY` in `.env` ([free signup](https://api.census.gov/data/key_signup.html)).
