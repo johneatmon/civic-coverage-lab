@@ -12,6 +12,9 @@ uv run python -m ccl.build seattle tacoma phoenix   # fetch + model
 uv run python -m ccl.report seattle tacoma phoenix  # 8-page PDF per city
 ```
 
+Sample output: [Seattle](out/report_seattle.pdf) · [Tacoma](out/report_tacoma.pdf) ·
+[Phoenix](out/report_phoenix.pdf)
+
 ---
 
 # Current results
@@ -159,7 +162,6 @@ At a 1,200 m service standard (~15 min walk):
 **The metric change moves 134,746 people — half of Seattle's population again — from
 "served" to "underserved."** That is the finding with a policy consequence attached.
 
-![demand-weighted pockets](out/demand_libraries.png)
 
 Top pockets under the network metric, anchored at their worst-served point:
 
@@ -789,31 +791,40 @@ what it uniquely offers (enclosed vs. edge), not for extent.
   Greedy is (1-1/e)-optimal for max-coverage, so an exact solve would only widen its
   already decisive margin.
 
-## Validation checks
-
-- Rasterised population: **752,498** vs Seattle's actual ≈755,000 (0.3% error).
-- Poverty rate 9.6%, car-free households 65,317 — both plausible for Seattle.
-- Synthetic-ring test for the persistence localisation (above).
-
 ## Running it
 
 ```bash
-uv run python src/ccl/fetch.py               # Seattle City GIS facility layers
-uv run python src/ccl/fields.py libraries    # both distance fields (~1 min)
-uv run python src/ccl/demand.py              # ACS + TIGER water rasters
-uv run python src/ccl/persistence.py libraries
-uv run python -m ccl.rank libraries
-uv run python -m ccl.viz libraries
-uv run python -m ccl.viz_demand libraries
-uv run python -m ccl.mclp libraries        # siting benchmark
-uv run python -m ccl.objectives libraries  # multi-objective comparison
+uv run python -m ccl.build seattle tacoma phoenix    # fetch, model, cache to data/city_<key>.npz
+uv run python -m ccl.report seattle tacoma phoenix   # 8-page PDF per city
+
+uv run python -m ccl.standards seattle               # profiles + car access, to stdout
+uv run python -m ccl.ladder                          # radius -> network -> terrain -> profile
+uv run python -m ccl.bench seattle                   # siting benchmark
+uv run python -m ccl.sensitivity seattle             # grade-threshold sensitivity
+uv run python -m ccl.viz_standards                   # out/standards_by_profile.png
 ```
 
-Needs `CENSUS_DATA_API_KEY` in `.env` ([free signup](https://api.census.gov/data/key_signup.html)).
+Needs `CENSUS_DATA_API_KEY` in `.env`
+([free signup](https://api.census.gov/data/key_signup.html)). The first `build` of a city
+downloads its walk network and DEM and takes a few minutes; afterwards both are cached.
 
-Data: facility points from Seattle City GIS ArcGIS services; walk network from OSM via
-OSMnx; boundary via Nominatim; population/poverty/vehicle from Census ACS5 2023; water
-from TIGER 2023.
+Adding a city takes a `City` entry in `ccl/cities.py`: place name, state and county FIPS,
+its UTM zone, and where the facility points come from.
+
+## Module map
+
+| module | role |
+|---|---|
+| `cities` | city config and the walker-speed profiles |
+| `build` | the pipeline — facilities, walk graph, elevation, travel-time fields, demand rasters |
+| `elevation` | USGS 3DEP tiles, Tobler speed, per-profile edge cost |
+| `landuse` | OSM mask of large non-residential land, for dasymetric allocation |
+| `standards` | underserved counts by profile, time budget and car access |
+| `ladder` | the radius → network → terrain → profile comparison |
+| `persistence` | H1 of a sublevel-set filtration, localised at death cells |
+| `bench` | siting strategies and their scoring |
+| `sensitivity` | how much the grade threshold is doing |
+| `report` | the per-city PDF |
 
 ---
 

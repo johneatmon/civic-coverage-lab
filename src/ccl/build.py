@@ -1,7 +1,7 @@
-"""City-parameterised pipeline: facilities, walk network, distance field, demand rasters.
+"""City-parameterised pipeline: facilities, walk network, travel-time fields, demand rasters.
 
-Supersedes the Seattle-only fetch.py / fields.py / demand.py path. Everything is keyed by
-city so Seattle and Tacoma can be built and compared with identical machinery.
+One entry point per city. `build(key)` fetches everything, models it and writes a single
+`data/city_<key>.npz` that every downstream module reads.
 """
 
 import io
@@ -16,14 +16,12 @@ import osmnx as ox
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from scipy.sparse import csr_matrix
-
 from ccl.cities import PROFILES, City, get
 from ccl.elevation import edge_seconds, fetch_dem, sample
-from ccl.graph import build_csr
 from ccl.landuse import mask as landuse_mask
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,6 +45,26 @@ TRACT_VARS = {
     "B08201_002E": "no_vehicle_hh",
 }
 TRACT_AMB = ["B18105_0%02dE" % i for i in (4, 7, 10, 13, 16, 20, 23, 26, 29, 32)]
+
+
+def build_csr(G: nx.MultiDiGraph, nodes: list) -> csr_matrix:
+    """CSR adjacency with edge weight = length.
+
+    to_scipy_sparse_array *sums* parallel edges on a multigraph, which is wrong for a
+    shortest-path weight, so parallel edges are collapsed to their minimum here.
+    """
+    idx = {n: i for i, n in enumerate(nodes)}
+    best: dict[tuple[int, int], float] = {}
+    for u, v, d in G.edges(data=True):
+        key = (idx[u], idx[v])
+        w = float(d.get("length", 0.0))
+        if key not in best or w < best[key]:
+            best[key] = w
+    rows = np.fromiter((k[0] for k in best), dtype=np.int32, count=len(best))
+    cols = np.fromiter((k[1] for k in best), dtype=np.int32, count=len(best))
+    vals = np.fromiter(best.values(), dtype=np.float64, count=len(best))
+    n = len(nodes)
+    return csr_matrix((vals, (rows, cols)), shape=(n, n))
 
 
 # ------------------------------------------------------------------ facilities

@@ -1,8 +1,9 @@
 """City-parameterised siting benchmark: MCLP vs persistent homology vs trivial baselines.
 
-Rebuilt on build.load() so it runs for any configured city. Supersedes mclp.py/objectives.py,
-which were wired to Seattle and had to round-trip the distance field through disk to make
-the adaptive strategies work.
+The question is whether the topological gap-finding this project started from is any use
+for the decision it is supposed to inform -- where the next branch goes. Every strategy
+draws from the same candidate grid and is scored the same way, and `worst_point` is the
+control: place at the worst-served inhabited cell, no topology anywhere.
 """
 
 import numpy as np
