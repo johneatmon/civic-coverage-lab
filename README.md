@@ -24,6 +24,25 @@ Everything in this section is re-derived from the current build by
 **changelog** — its numbers are as-of the phase that produced them and several have since
 been superseded. Where the two disagree, this section is right.
 
+> **Data provenance.** Figures were produced on **2026-08-17**. Sources differ in how
+> stable they are, which is what determines whether a rebuild reproduces them:
+>
+> | source | used for | vintage |
+> |---|---|---|
+> | US Census ACS 5-year | population, age, poverty, vehicle access, ambulatory difficulty | **2023 release — fixed** |
+> | US Census TIGER | block group / tract geometry, water | **2023 release — fixed** |
+> | USGS 3DEP | elevation | accessed 2026-08-17; revised infrequently |
+> | Municipal open data | branch locations | accessed 2026-08-17 |
+> | OpenStreetMap | walk network, land use | accessed 2026-08-17 — **live and mutable** |
+>
+> The Census inputs are versioned releases and will reproduce exactly. OpenStreetMap is
+> edited continuously, so rebuilding shifts these numbers by roughly a point or two — a
+> rebuild on 2026-08-18 moved 15 of 93 README figures, none by more than 2% except one
+> percentile over 30 draws. Pinning it is not practical: the three walk graphs are 517 MB,
+> which is Git LFS territory for data that is fully re-derivable. The verifier scripts
+> therefore check the documents against *whatever build is on disk*, so after a rebuild
+> expect a few mismatches and regenerate rather than hunt a bug.
+
 > **Figures are from an OpenStreetMap extract dated 2026-08-17.** OSM is a live dataset:
 > rebuilding re-downloads the walk network and land-use polygons, and edits made since will
 > shift these numbers by roughly a point or two. Exact reproducibility is not achievable

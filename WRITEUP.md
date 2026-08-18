@@ -193,7 +193,9 @@ Every figure above is re-derived from a fresh run by
 [`scripts/verify_writeup.py`](scripts/verify_writeup.py) — 63 assertions, all passing
 against the current build.
 
-Figures come from an OpenStreetMap extract dated 2026-08-17. OSM is live, so rebuilding
-shifts them by a point or two; the three walk graphs are 517 MB and cannot be pinned, so
-the verifier checks the document against whatever build is on disk rather than against a
-frozen snapshot.
+Figures were produced on **2026-08-17**. The Census inputs (ACS 5-year 2023, TIGER 2023)
+are fixed releases and reproduce exactly. OpenStreetMap — the walk network and land use —
+is live and edited continuously, so a rebuild shifts these numbers by a point or two.
+Pinning it would mean committing 517 MB of walk graphs for data that is fully re-derivable,
+so the verifier checks this document against whatever build is on disk rather than a frozen
+snapshot.

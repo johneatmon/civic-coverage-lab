@@ -482,7 +482,10 @@ def build_report(city_key: str, k: int = 8) -> Path:
         _para(fig, 0.313,
               "OpenStreetMap (walk network, land use) · US Census ACS 5-year 2023 and "
               "TIGER (population,\ndemographics, water) · USGS 3DEP (elevation) · "
-              "municipal open data (branch locations).\n\n"
+              "municipal open data (branch locations).\n"
+              "Census inputs are fixed 2023 releases. OpenStreetMap and 3DEP were accessed "
+              "2026-08-17;\nOpenStreetMap is edited continuously, so a later rebuild will "
+              "move these figures slightly.\n\n"
               "Grade thresholds follow the 2010 ADA Standards and the US Access Board's "
               "PROWAG: an accessible\nroute is limited to 1:20 (5%); 1:12 (8.3%) applies "
               "to ramps and curb ramps, not to walking a\nblock. PROWAG permits a route "
