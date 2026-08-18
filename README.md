@@ -1,10 +1,135 @@
 # Civic Coverage Lab
 
-Do persistent-homology coverage models change materially when you swap Euclidean distance
-for real walk-network distance — and does it matter once you weight by who actually lives
-there?
+Walking access to civic amenities, measured properly: real street networks, real terrain,
+and separate walker profiles — then benchmarked against classical facility-location
+optimisation to see whether the topology the project started from actually helps.
 
-Case studies: Seattle (28 branches), Tacoma (8), Phoenix (17).
+Case studies: Seattle (28 library branches), Tacoma (8), Phoenix (17).
+Narrative version: **[WRITEUP.md](WRITEUP.md)**.
+
+```bash
+uv run python -m ccl.build seattle tacoma phoenix   # fetch + model
+uv run python -m ccl.report seattle tacoma phoenix  # 8-page PDF per city
+```
+
+---
+
+# Current results
+
+Everything in this section is re-derived from the current build by
+[`scripts/verify_readme.py`](scripts/verify_readme.py). The phase log further down is a
+**changelog** — its numbers are as-of the phase that produced them and several have since
+been superseded. Where the two disagree, this section is right.
+
+## Access
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| branches | 28 | 8 | 17 |
+| residents analysed | 721,942 | 210,290 | 1,522,291 |
+| residents per branch | 25,784 | 26,286 | **89,547** |
+| median walk to a branch | 19 min | 26 min | **53 min** |
+| adults beyond a 15-min walk | 57.5% | 79.5% | **95.0%** |
+| 65+ beyond a 15-min walk | 75.0% | 89.5% | 97.4% |
+| ambulatory difficulty beyond a 15-min walk | **92.5%** | **95.4%** | **98.5%** |
+
+## How you measure changes the answer
+
+Same city, same branches, each rung measured more carefully. Rungs 1–3 hold the population
+fixed; rung 4 changes both the model and the population it applies to.
+
+| rung | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| 1. straight-line radius, 1,206 m | 35.8% | 62.5% | 89.9% |
+| 2. + street network | 55.4% (+19.7) | 79.2% (+16.7) | 95.0% (+5.1) |
+| 3. + terrain | 57.5% (+2.1) | 79.5% (+0.4) | 95.0% (+0.0) |
+| 4. + mobility profile | 92.5% | 95.4% | 98.5% |
+| **straight-line understates by** | **21.7 pts / 156,787** | 17.0 pts / 35,775 | 5.2 pts / 78,795 |
+
+The network step is large everywhere, including flat gridded Phoenix — a grid forces
+Manhattan travel at ~1.3× straight-line regardless of terrain. Median detour ratio:
+Seattle 1.32, Tacoma 1.35, Phoenix 1.35.
+
+## Terrain, and who pays for it
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| walk segments steeper than the 5% accessible-route grade | 24.5% | 14.2% | 1.9% |
+| residents with no route to a branch within a 5% grade | **12,736** (46%) | 3,391 (24%) | 1,063 (1.3%) |
+
+Adding terrain moves the adult figure ~2 points and the ambulatory-difficulty figure ~12.
+Nearly the whole cost of topography falls on one group. The no-route count is
+threshold-sensitive (966–18,925 across 4–15% cutoffs in Seattle) and should not be quoted
+alone; under a graded penalty instead of a cutoff nobody is stranded, yet the same cohort
+still faces a median 41-minute walk with no slope penalty applied at all.
+
+## Car access inverts the naive assumption
+
+Households beyond a 15-minute walk:
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| no vehicle available | **38.1%** | 72.1% | 92.4% |
+| has a vehicle | **58.6%** | 80.0% | 94.7% |
+
+Car-free households are *better* served, because they cluster in dense cores where the
+branches already are. The advantage is 20 points in Seattle, 8 in Tacoma and 2 in Phoenix —
+it tracks how much walkable core a city has, which is why it nearly vanishes in sprawl.
+
+## Siting: topology loses
+
+Eight new branches from a shared candidate grid, scored on residents brought within 15
+minutes.
+
+| strategy | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| **greedy MCLP** | **+84,673** | **+51,174** | **+86,538** |
+| random (mean of 30 draws) | +33,845 | +21,918 | +24,453 |
+| PH by persistence | +25,037 | +10,368 | +12,462 |
+| PH by population | +16,409 | +22,563 | +7,283 |
+| worst-served point (no topology) | +5,139 | +6,507 | +4,722 |
+
+Against the full random distribution rather than its mean, PH by persistence beats 16.7% /
+0.0% / 0.0% of 30 draws and PH by population 0.0% / 63.3% / 0.0%. Five of six sit below
+almost every random draw; the sixth sits mid-distribution, which is absence of signal
+rather than a win. MCLP falls outside the random range entirely in all three cities.
+
+**Why:** remoteness is a weak guide to coverage gain (Pearson +0.01 / −0.13 / −0.26) and
+the extremum these rules target is far worse than the bulk — the most remote site gains
+477 / 66 / 91 residents against pool medians of 3,575 / 2,699 / 2,847, i.e. 13% / 2% / 3%.
+
+**Why population weighting does not rescue it:** ranking gaps by population only
+discriminates where there is more than one gap worth ranking. The largest pocket holds
+40.6% of Seattle's underserved but 90.8% of Tacoma's and 98.4% of Phoenix's, so outside
+Seattle the ranking returns the same pocket every time and is not being measured at all.
+
+## Positioning
+
+UW Taskar Center's **Walkshed** does planner-facing pedestrian accessibility on
+**OS-CONNECT**, a statewide sidewalk network with curb ramps and crossings. On network
+fidelity in Washington they win outright; anything built on street centrelines is a proxy.
+The differentiators here are the per-profile decomposition with its own population
+denominators, the siting benchmark, and portability — OS-CONNECT is Washington-only, and
+this pipeline ran Phoenix by changing a UTM zone and a county FIPS. Swapping OS-CONNECT in
+for the Washington cities is the obvious v2.
+
+## Known limits
+
+Sidewalk presence and quality, curb ramps, crossing delay, cross slope (2.1% under PROWAG,
+a common real-world failure), transit, opening hours and branch capacity are all unmodelled.
+Grade comes from street centrelines, not sidewalks. Every one of those omissions pushes the
+same way: the mobility figures here are optimistic. Walking speeds are planning defaults,
+not locally observed; travel time is one-way.
+
+---
+
+# Development log
+
+**These sections are a changelog, not current results.** Each records what was true when it
+was written, including several findings later corrected — the grade threshold (phase 5–6
+used 8.33%, which was wrong), population allocation (phases 1–7 smeared residents across
+parks), and the phase-1 magnitude (see the note below). They are kept because the
+corrections are the most instructive part of the project. For current numbers see above.
 
 ## Phase 1 — the geometric gate
 
@@ -13,6 +138,16 @@ there is nothing to build.
 
 **Verdict: passes emphatically.** The two metrics do not merely relocate holes — they
 disagree about whether holes exist at all.
+
+> **Superseded, and this one weakened.** These figures predate the TIGER water mask added
+> in phase 2, so the network column included holes centred on Lake Washington's floating
+> bridges. Recomputed on the current build the comparison is Euclidean **11 holes /
+> 10,719 m** total persistence against network **20 / 25,508 m** — bottleneck distance
+> 1,839 m. The direction survives (roughly 2× the holes, 2.4× the total persistence) but
+> the original "15× more" and "Euclidean finds essentially nothing" framing did not: once
+> the water artifacts are removed, Euclidean does find real holes. The load-bearing version
+> of this result is the measurement ladder in *Current results*, which is stated in people
+> rather than persistence and does not depend on the topology at all.
 
 | | Euclidean | Walk network |
 |---|---:|---:|
@@ -41,6 +176,11 @@ disagree about whether holes exist at all.
 Persistence measures the geometric size of a hole, not whether anyone is stranded in it.
 Unweighted, the top holes were an industrial strip and a floating bridge. Adding ACS
 population, poverty, and car-free-household layers plus TIGER water masking fixes that.
+
+> **Superseded.** Recomputed on the current build at the 1,206 m standard: Euclidean
+> 258,303 (35.8%), network 400,242 (55.4%). The headline gap holds; pocket counts moved
+> more (20 and 17 rather than 29 and 42) because later phases masked water and reallocated
+> population off parks and industrial land.
 
 At a 1,200 m service standard (~15 min walk):
 
@@ -76,6 +216,10 @@ demand variable, and it is not a cosmetic difference.
 | people underserved | 627,255 | 554,279 | 479,551 | 402,550 | 248,561 | 134,686 |
 
 ## Phase 3 — does topology beat MCLP? No.
+
+> **Superseded numbers, unchanged conclusion.** This benchmark ran on flat distance
+> before terrain, dasymetric population and the travel-time model. Current figures are
+> in *Current results*; the ordering is the same in all three cities.
 
 Two negative results, and they point the same way.
 
@@ -149,6 +293,9 @@ complementary, and neither one needs topology.
 
 
 ## Phase 4 — real standards, walker profiles, and a second city
+
+> **Superseded numbers.** Profile figures here predate the slope model and the 5%
+> grade correction; see *Current results*.
 
 A civil engineer for the City of Tacoma reviewed this and made three points that reshaped
 the framing:
@@ -234,6 +381,10 @@ population-per-branch ratio (26.1k vs 25.7k): **20.4% of Tacoma residents are wi
 
 ## Phase 5 — slope, and the PDF report
 
+> **Superseded: wrong threshold.** This phase used 8.33%, the maximum for a *ramp*,
+> as if it were the limit for a pedestrian route. Phase 9 corrects it to 1:20 (5%),
+> which roughly triples the excluded population.
+
 ### Slope's real effect is passability, not speed
 
 Travel time now uses Tobler's hiking function renormalised to each profile's flat speed,
@@ -272,6 +423,9 @@ uv run python -m ccl.report seattle tacoma
 
 
 ## Phase 6 — is the ADA cutoff doing the work?
+
+> **Superseded threshold.** The sensitivity structure holds, but it is centred on
+> 8.33%; phase 9 re-centres it on 5%.
 
 Treating a segment above 8.33% as impassable is a modelling choice, so it was stress-tested
 two ways: the threshold, and the model form.
@@ -325,6 +479,9 @@ slope penalty at all. The PDF now states all three.
 
 
 ## Phase 7 — Phoenix, and a prediction I got wrong
+
+> **Superseded numbers.** Predates the 5% correction and dasymetric allocation; the
+> prediction-refuted finding and the detour ratios are unchanged.
 
 Phoenix was added as the flat, gridded control: 17 branches, 1,002 km², 1.5 M residents.
 Adding it required making the projected CRS per-city (Phoenix is UTM 12N, not Washington's
@@ -690,3 +847,14 @@ Needs `CENSUS_DATA_API_KEY` in `.env` ([free signup](https://api.census.gov/data
 Data: facility points from Seattle City GIS ArcGIS services; walk network from OSM via
 OSMnx; boundary via Nominatim; population/poverty/vehicle from Census ACS5 2023; water
 from TIGER 2023.
+
+---
+
+## Verification
+
+Both documents' current-state figures are re-derived from a fresh build:
+
+```bash
+uv run python scripts/verify_readme.py    # 93 assertions, README "Current results"
+uv run python scripts/verify_writeup.py   # 63 assertions, WRITEUP.md
+```
