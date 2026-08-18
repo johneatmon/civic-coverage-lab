@@ -508,29 +508,54 @@ now does it, and the headline number is the one a planner or journalist would ac
 156,787 people.** Tacoma: 17.0 points. Phoenix: 5.2 points (compressed only because Phoenix
 starts at 89.9% underserved by radius, leaving little headroom).
 
-### Why population-weighted PH does worse than persistence-ranked PH
+### Why distance-driven siting loses — measured across all three cities
 
-The plausible explanation — that population weighting selects small dense holes with low
-marginal gain — is wrong. Measured, it selects the **largest** pockets: median pocket
-population 168,663 against 67,639 for the persistence ranking.
+The first version of this claim was Seattle-only and did not survive replication. What
+replicates and what does not:
 
-The real mechanism is that population ranks the *region* while the placement rule still
-picks the worst-served *point inside it*. A larger region has a more extreme extremum, so
-the weighting selects a better neighbourhood and then a worse corner of it. The population
-signal never reaches the decision.
-
-Underneath both is the number that explains the whole benchmark: across the candidate pool
-the correlation between a site's travel time from existing branches and its marginal
-coverage gain is **+0.01**. Remoteness is uninformative about coverage. Random sampling
-draws from the middle of that distribution (median gain 3,575); every distance-driven rule
-deliberately samples its emptiest tail.
-
-| Seattle, median per strategy | marginal gain | pocket population | min from a branch |
+| | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| MCLP greedy | 10,978 | 62,601 | 23 |
-| PH by persistence | 2,160 | 67,639 | 34 |
-| PH by population | 1,149 | 168,663 | 40 |
-| worst-point | 477 | 67,182 | 46 |
+| candidate sites | 833 | 470 | 3,571 |
+| Pearson r (remoteness vs marginal gain) | +0.01 | −0.13 | −0.26 |
+| Spearman r | +0.19 | −0.02 | −0.25 |
+| median gain, any candidate | 3,575 | 2,699 | 2,847 |
+| gain at the most remote site (worst-point) | **477** | **66** | **91** |
+| that as a share of median | 13% | 2% | 3% |
+
+**The bulk correlation does not replicate** — it is weak everywhere (|r| ≤ 0.26) but flips
+sign between cities, so "remoteness is uncorrelated with gain" was an overreach from one
+city and one estimator.
+
+**The tail does replicate, emphatically.** The most remote site in each city gains 2–13% of
+what a median site gains. The mechanism is not that remoteness is anti-correlated with
+need; it is that the *extremum* of a weakly-informative quantity is reliably
+unrepresentative. Random sampling draws from the middle of that distribution; every
+distance-driven rule draws from its emptiest corner.
+
+### Why population-weighted PH beats persistence in Tacoma but loses in Seattle
+
+In Seattle, population weighting does worse (+16,409 vs +25,037) and not for the obvious
+reason: it selects the **largest** pockets (median pocket population 168,663 vs 67,639),
+not small dense ones. It ranks the region correctly, then still places at the worst-served
+point inside it — a larger region has a more extreme extremum, so it picks a better
+neighbourhood and a worse corner of it.
+
+That flips in Tacoma (+8,550 vs +3,363), because the ranking is degenerate there:
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| pockets | 38 | 18 | 129 |
+| largest pocket, share of all underserved | **40.6%** | **90.8%** | **98.4%** |
+| largest ÷ second | 2.5× | 10.7× | 122.5× |
+
+Where one mega-pocket holds nearly everyone, ranking by population returns the same pocket
+every time and the strategy collapses to "worst-served point of the one big gap" — so the
+PH-population vs PH-persistence comparison is noise. Population-weighting a topological gap
+ranking only has purchase where the underserved population is genuinely fragmented; in the
+sprawl case it degenerates.
+
+The report now computes all of these per city rather than printing Seattle's figures on
+every city's page, which is what it was doing.
 
 ### Positioning
 

@@ -27,30 +27,48 @@ Three cities, one verdict. **Topological holes are a diagnostic, not an optimise
 ## Why it loses
 
 Persistence measures how deep a gap is, and marks its most remote point. The trouble is
-that remoteness carries almost no information about how many people a branch would reach.
-Across the candidate pool, the correlation between a site's travel time from existing
-branches and its marginal coverage gain is **+0.01**.
+that remoteness is a weak guide to how many people a branch would reach — and the specific
+places these rules aim at are far worse than weak.
 
-That single number explains the whole table. Random placement draws from the middle of a
-distribution whose median site gains 3,575 residents. Every distance-driven rule — both PH
-variants, and the worst-point control — deliberately samples the extreme tail of a
-quantity that is uncorrelated with the objective, and the extreme tail of "far from
-everything" is reliably the emptiest place in the city. Targeting it is worse than not
-aiming at all.
+Across the candidate pool the correlation between a site's travel time from existing
+branches and its marginal coverage gain is small and not even consistent in sign: **+0.01
+in Seattle, −0.13 in Tacoma, −0.26 in Phoenix** (rank correlations +0.19, −0.02, −0.25).
+Remoteness explains at most about 7% of the variance in gain anywhere, and in Seattle
+essentially none.
 
-### The counterintuitive part
+The tail is where the damage is. A median candidate site gains 3,575 residents in Seattle,
+2,699 in Tacoma, 2,847 in Phoenix. The site that the no-topology worst-point rule
+selects — the most remote place in the city — gains **477, 66 and 91**. That is 13%, 2%
+and 3% of a median site.
 
-Weighting the holes by population made things *worse* (+16,409 against +25,037). My first
-guess was that it selects small dense pockets with little room to gain. The data says the
-opposite: population-weighted PH picks the **largest** pockets — median pocket population
+So the mechanism is not "remoteness is anti-correlated with need". It is that the extreme
+of a weakly-informative quantity is reliably unrepresentative. Random placement draws from
+the middle of that distribution and does fine. Every distance-driven rule deliberately
+draws from its emptiest corner.
+
+### The counterintuitive part, and where it stops
+
+In Seattle, weighting the holes by population made things *worse* (+16,409 against
++25,037). My first guess was that it selects small dense pockets with little room to gain.
+The data says the opposite: it picks the **largest** pockets — median pocket population
 168,663, against 67,639 for the persistence ranking.
 
-The bug is subtler and more interesting. Population ranks the *region*; the placement rule
-then still puts the branch at the worst-served *point inside that region*. A larger region
-has a more extreme extremum, so the weighting selects a better neighbourhood and then a
-worse corner of it. The population signal never survives the trip to the decision. Fixing
-that means changing the placement rule, not the ranking — at which point you have
-reinvented maximal covering, badly.
+The bug is subtler. Population ranks the *region*; the placement rule then still puts the
+branch at the worst-served *point inside that region*. A larger region has a more extreme
+extremum, so the weighting selects a better neighbourhood and then a worse corner of it.
+The population signal never survives the trip to the decision.
+
+**This does not replicate, and the reason is the interesting part.** In Tacoma the ordering
+flips (+8,550 for population against +3,363 for persistence). Ranking gaps by population
+only means anything if there is more than one gap worth ranking — and the largest single
+pocket holds 40.6% of Seattle's underserved residents but **90.8% of Tacoma's and 98.4% of
+Phoenix's**. Where one mega-pocket contains nearly everyone, the ranking returns the same
+pocket every time, the strategy collapses to "worst-served point of the one big gap", and
+the comparison between the two PH variants is noise.
+
+Which is itself a finding about the method: population-weighting a topological gap ranking
+only has purchase in cities whose underserved population is genuinely fragmented. In the
+sprawl case it degenerates.
 
 ## Where topology did earn its keep
 

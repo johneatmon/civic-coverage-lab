@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.colors import ListedColormap, LogNorm
-from scipy import ndimage
+from scipy import ndimage, stats
 
 from ccl.bench import field_from as bench_field
 from ccl.bench import results as bench_results
@@ -90,6 +90,24 @@ def build_report(city_key: str, k: int = 8) -> Path:
     base_cov = ((bench_field(sb, d["fac_nodes"]) <= R["standard"]) & d["inhabited"]).ravel()
     popflat = np.where(d["inhabited"].ravel(), d["population"].ravel(), 0.0)
     gain_all = (cov & ~base_cov) @ popflat
+
+    # Mechanism stats, computed per city -- these differ enough between cities that
+    # hardcoding one city's figures onto every report is simply wrong.
+    _bf = bench_field(sb, d["fac_nodes"])
+    _remote = np.array([_bf[r, c] for r, c in sb["cand_rc"]]) / 60.0
+    _ok = np.isfinite(_remote) & np.isfinite(gain_all)
+    MECH = {
+        "pearson": float(stats.pearsonr(_remote[_ok], gain_all[_ok]).statistic),
+        "spearman": float(stats.spearmanr(_remote[_ok], gain_all[_ok]).statistic),
+        "pool_median": float(np.median(gain_all[_ok])),
+        "worst_median": float(np.median(gain_all[R["picks"]["worst-point (no topology)"]])),
+    }
+    _lab, _n = ndimage.label((_bf > R["standard"]) & d["land"],
+                             structure=ndimage.generate_binary_structure(2, 1))
+    _pp = np.array(sorted([d["population"][_lab == i].sum()
+                           for i in range(1, _n + 1)])[::-1] or [0.0, 0.0])
+    MECH["largest_share"] = 100.0 * _pp[0] / max(_pp.sum(), 1)
+    MECH["n_pockets"] = _n
 
     _PAGE["n"] = 0
     with PdfPages(path) as pdf:
@@ -216,22 +234,38 @@ def build_report(city_key: str, k: int = 8) -> Path:
               f"({rnd:,.0f}). Topological holes are a diagnostic, not an optimiser.")
         _para(fig, 0.415, "Why distance-driven strategies lose", size=11, weight="bold")
         _para(fig, 0.383,
-              "Persistence marks the most remote point of a gap, and remoteness is nearly "
-              "uninformative about\nhow many people a branch would reach: across the "
-              "candidate pool the correlation between a\nsite's travel time from existing "
-              "branches and its marginal coverage gain is +0.01. Random\nsampling at "
-              "least draws from the middle of that distribution; targeting the extreme "
-              "draws from\nits emptiest tail, which is why the no-topology "
-              "worst-point rule finishes last of all.", size=9)
-        _para(fig, 0.275, "The counterintuitive part", size=11, weight="bold")
-        _para(fig, 0.243,
-              "Weighting holes by population made the result worse, not better. It does "
-              "not select small dense\nholes — it selects the largest ones (median pocket "
-              "population 168,663 against 67,639 for the\npersistence ranking). The "
-              "weighting ranks the region correctly, then still places at the "
-              "worst-served\npoint inside it — and a larger region has a more extreme "
-              "extremum. So it picks a better\nneighbourhood and a worse corner of it. "
-              "The population signal never reaches the decision.", size=9)
+              f"Persistence marks the most remote point of a gap, and remoteness turns out "
+              f"to be a weak guide\nto how many people a branch would reach: across the "
+              f"{len(sb['cand_nodes']):,} candidate sites the correlation between\na "
+              f"site's travel time from existing branches and its marginal coverage gain "
+              f"is only "
+              f"{MECH['pearson']:+.2f} (rank\ncorrelation {MECH['spearman']:+.2f}). "
+              f"The bulk relationship is weak — but the tail these strategies aim at\nis "
+              f"far worse than weak. A median candidate site gains "
+              f"{MECH['pool_median']:,.0f} residents; the site the\nno-topology "
+              f"worst-point rule selects gains {MECH['worst_median']:,.0f}, or "
+              f"{100 * MECH['worst_median'] / max(MECH['pool_median'], 1):.0f}% of that. "
+              f"Random sampling draws\nfrom the middle of the distribution; targeting the "
+              f"extreme draws from its emptiest corner.", size=9)
+        _para(fig, 0.252, "How much the population ranking can help here", size=11,
+              weight="bold")
+        _para(fig, 0.220,
+              (f"Very little in this city. Ranking gaps by population only discriminates "
+               f"if there is more than one\ngap worth ranking, and "
+               f"{city.place.split(',')[0]}'s largest single pocket holds "
+               f"{MECH['largest_share']:.0f}% of all underserved\nresidents across "
+               f"{MECH['n_pockets']} pockets — so the ranking returns the same pocket "
+               f"almost every time and the\nchoice collapses back to picking its "
+               f"worst-served point."
+               if MECH["largest_share"] >= 80 else
+               f"{city.place.split(',')[0]}'s underserved population is spread across "
+               f"{MECH['n_pockets']} pockets, the largest holding "
+               f"{MECH['largest_share']:.0f}%,\nso ranking them by population is a real "
+               f"choice. It still hurts: the weighting ranks the region\ncorrectly, then "
+               f"places at the worst-served point inside it — and a larger region has a "
+               f"more\nextreme extremum. It picks a better neighbourhood and a worse "
+               f"corner of it, so the population\nsignal never reaches the decision."),
+              size=9)
         _para(fig, 0.125,
               f"Candidate sites are habitable cells on a 450 m grid ({len(R['s']['cand_nodes']):,} "
               f"of them). Greedy MCLP is\n(1-1/e)-optimal for max-coverage, so an exact "
