@@ -158,6 +158,34 @@ Worth recording, because the corrections were more instructive than the plan:
   Seattle's walk network is not connected. The default silently deleted West Seattle,
   including five library branches.
 
+## The finding that needed a second amenity
+
+Libraries were the case study; the pipeline takes a `(city, amenity)` pair. Running parks —
+against the 10-minute standard Metro Parks Tacoma actually adopted — produced the result I
+did not expect.
+
+Parks are much better distributed. Under a fifth of Seattle adults are beyond a 10-minute
+walk to one, against well over half for a 15-minute walk to a library. But **the gap between
+an able-bodied adult and someone with an ambulatory difficulty is wider for parks, not
+narrower**: 53 points against 36.
+
+The reason is in the land:
+
+| mean walk-segment grade | city-wide | near libraries | near parks |
+|---|---:|---:|---:|
+| Seattle | 3.9% | **3.0%** | **4.7%** |
+| Tacoma | 2.6% | 2.6% | **3.3%** |
+
+A library is a building and buildings go where building is cheap, so branches sit on land
+flatter than the city average. Parkland is largely what was left over — ravines, greenbelts,
+bluffs, the slopes nobody could develop. The amenity that looks most equitably distributed
+when you count facilities is the least equitable once you account for who is walking.
+
+Getting there required one real modelling change: a park is a polygon you enter at its edge,
+so access nodes are every network node inside it or within 25 m, not a centroid. For Point
+Defiance a centroid would have sat 800 m from any way in — the same error that, in an
+earlier version, had the tool proposing a new library in the middle of that park.
+
 ## What this is not
 
 [UW's Taskar Center](https://tcat.cs.washington.edu/) has been doing pedestrian

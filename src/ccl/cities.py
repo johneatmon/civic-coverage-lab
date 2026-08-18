@@ -66,13 +66,9 @@ class City:
     state: str
     county: str
     pop_reference: int  # published city population, for validating the raster
-    facility_source: str  # "arcgis" or "osm"
     # Projected CRS in metres. Must match the city's UTM zone -- using Washington's
     # zone 10N for Phoenix would distort every distance in the pipeline.
     crs: str = "EPSG:32610"
-    arcgis_service: str | None = None
-    arcgis_url: str | None = None
-    osm_filter: dict = field(default_factory=dict)
 
 
 CITIES = {
@@ -81,22 +77,14 @@ CITIES = {
         place="Seattle, Washington, USA",
         state="53", county="033",  # King County
         pop_reference=755_000,
-        facility_source="arcgis",
         crs="EPSG:32610",  # UTM 10N
-        arcgis_service="Seattle_Public_Library",
     ),
     "tacoma": City(
         key="tacoma",
         place="Tacoma, Washington, USA",
         state="53", county="053",  # Pierce County
         pop_reference=222_000,
-        facility_source="osm",
         crs="EPSG:32610",  # UTM 10N
-        # OSM tags amenity=library indiscriminately: the 12 features in Tacoma include
-        # two university libraries and a prep-school one. The operator website is the
-        # reliable discriminator -- the 8 that match are locations/1..8, which is
-        # exactly Tacoma Public Library's branch count.
-        osm_filter={"tags": {"amenity": "library"}, "website_contains": "tacomalibrary.org"},
     ),
 }
 
@@ -106,10 +94,7 @@ CITIES["phoenix"] = City(
     place="Phoenix, Arizona, USA",
     state="04", county="013",  # Maricopa County
     pop_reference=1_650_000,
-    facility_source="arcgis_url",
     crs="EPSG:32612",  # UTM 12N
-    arcgis_url=("https://maps.phoenix.gov/pub/rest/services/Public/Libraries/"
-                "MapServer/0/query"),
 )
 
 
@@ -117,3 +102,73 @@ def get(key: str) -> City:
     if key not in CITIES:
         raise KeyError(f"unknown city {key!r}; known: {sorted(CITIES)}")
     return CITIES[key]
+
+
+# --------------------------------------------------------------------- amenities
+
+
+@dataclass(frozen=True)
+class Amenity:
+    """What is being measured access *to*.
+
+    `geometry` is the load-bearing field. A library is a door: a point. A park is an area
+    you enter at its edge, so collapsing it to a centroid puts the access point hundreds of
+    metres from where anyone actually walks in -- for a 275 ha park that is a bigger error
+    than the thing being measured.
+    """
+
+    key: str
+    noun: str            # singular, for prose
+    label: str           # plural, for headings
+    geometry: str        # "point" | "polygon"
+    headline_min: int    # the time budget this amenity's standard is written in
+    standard_note: str
+    sources: dict        # city key -> source spec
+
+
+# Trust for Public Land's 10-minute-walk methodology, and Metro Parks Tacoma's own
+# standard, both count publicly accessible park land and exclude golf courses, cemeteries
+# and paid-admission attractions. Seattle's layer is parcel-level, so it is dissolved by
+# name first: 2,000 polygons are roughly 500 parks.
+_PARK_MIN_AREA_M2 = 1_000.0
+_PARK_EXCLUDE = ("GOLF", "ZOO", "CEMETERY")
+
+AMENITIES = {
+    "libraries": Amenity(
+        key="libraries", noun="library", label="library branches",
+        geometry="point", headline_min=15,
+        standard_note="15-minute neighbourhood goal; 3 mph on the flat = 0.75 mi",
+        sources={
+            "seattle": {"kind": "arcgis_service", "service": "Seattle_Public_Library"},
+            "tacoma": {"kind": "osm", "tags": {"amenity": "library"},
+                       "website_contains": "tacomalibrary.org"},
+            "phoenix": {"kind": "arcgis_url",
+                        "url": "https://maps.phoenix.gov/pub/rest/services/Public/"
+                               "Libraries/MapServer/0/query"},
+        },
+    ),
+    "parks": Amenity(
+        key="parks", noun="park", label="parks",
+        geometry="polygon", headline_min=10,
+        standard_note="10-minute walk to a park (Metro Parks Tacoma; Trust for Public Land)",
+        sources={
+            "seattle": {"kind": "arcgis_url",
+                        "url": "https://services.arcgis.com/ZOyb2t4B0UYuYNYH/arcgis/rest/"
+                               "services/Park_Boundary_%28details%29/FeatureServer/2/query",
+                        "dissolve": "NAME", "exclude_name": _PARK_EXCLUDE,
+                        "min_area_m2": _PARK_MIN_AREA_M2},
+            "tacoma": {"kind": "osm",
+                       "tags": {"leisure": ["park", "nature_reserve"],
+                                "landuse": "recreation_ground"},
+                       "exclude_access": ("private", "no"),
+                       "exclude_name": _PARK_EXCLUDE,
+                       "min_area_m2": _PARK_MIN_AREA_M2},
+        },
+    ),
+}
+
+
+def amenity(key: str) -> Amenity:
+    if key not in AMENITIES:
+        raise KeyError(f"unknown amenity {key!r}; known: {sorted(AMENITIES)}")
+    return AMENITIES[key]

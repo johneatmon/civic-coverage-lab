@@ -8,7 +8,8 @@ speed model, and for the mobility profile through ADA-impassable edges.
 import numpy as np
 
 from ccl.build import load
-from ccl.cities import PAR_MAX_GRADE, PROFILES, TIME_BUDGETS_MIN, distance_m, get
+from ccl.cities import (PAR_MAX_GRADE, PROFILES, TIME_BUDGETS_MIN,
+                        amenity as get_amenity, distance_m, get)
 
 
 def flat_underserved(d, pop_field, threshold_m, metric="network"):
@@ -29,10 +30,13 @@ def time_underserved(d, profile, minutes):
             float(d[profile.pop_field][unreachable].sum()))
 
 
-def summary(city_key: str) -> dict:
+def summary(city_key: str, amenity_key: str = "libraries") -> dict:
     """All the numbers the report needs, in one pass."""
-    city, d = get(city_key), load(city_key)
-    out = {"city": city, "d": d, "n_facilities": int(d["fac_nodes"].size)}
+    city, am = get(city_key), get_amenity(amenity_key)
+    d = load(city_key, amenity_key)
+    out = {"city": city, "amenity": am, "d": d, "headline_min": am.headline_min,
+           "n_facilities": int(d["n_facilities"]) if "n_facilities" in d
+                           else int(d["fac_nodes"].size)}
 
     mask = d["land"]
     out["population"] = float(d["population"][mask].sum())
@@ -51,10 +55,10 @@ def summary(city_key: str) -> dict:
         rows.append(r)
     out["profiles"] = rows
 
-    # Car access at the 15-minute adult standard, slope-aware.
+    # Car access at the amenity's own standard, slope-aware.
     adult = PROFILES[0]
     f = d[f"time_{adult.key}"]
-    beyond = mask & ~(f <= 15 * 60.0)
+    beyond = mask & ~(f <= am.headline_min * 60.0)
     tot_all, tot_no = float(d["households"][mask].sum()), float(d["no_vehicle_hh"][mask].sum())
     b_all, b_no = float(d["households"][beyond].sum()), float(d["no_vehicle_hh"][beyond].sum())
     out["car"] = {
@@ -66,10 +70,10 @@ def summary(city_key: str) -> dict:
     return out
 
 
-def report(city_key: str) -> None:
-    s = summary(city_key)
+def report(city_key: str, amenity_key: str = "libraries") -> None:
+    s = summary(city_key, amenity_key)
     d, city = s["d"], s["city"]
-    print(f"\n{'=' * 92}\n{city.place.upper()} — {s['n_facilities']} library locations")
+    print(f"\n{'=' * 92}\n{city.place.upper()} — {s['n_facilities']} {s['amenity'].label}")
     print(f"elevation {s['elev_range'][0]:.0f}–{s['elev_range'][1]:.0f} m; "
           f"{s['grade_steep_pct']:.1f}% of walk edges steeper than the 5% accessible-route grade")
     print("=" * 92)
@@ -85,7 +89,7 @@ def report(city_key: str) -> None:
                   f"{c['beyond']:>9,.0f} ({c['pct']:4.1f}%)"
                   f"{c['unreachable']:>14,.0f}")
 
-    print(f"\n--- car access, 15-minute adult standard (slope-aware) ---")
+    print(f"\n--- car access, {s['headline_min']}-minute adult standard (slope-aware) ---")
     print(f"{'households':28s}{'total':>12s}{'beyond':>12s}{'rate':>9s}")
     for k, lab in [("no_vehicle", "no vehicle available"), ("has_vehicle", "has a vehicle"),
                    ("all", "all households")]:
@@ -96,5 +100,9 @@ def report(city_key: str) -> None:
 if __name__ == "__main__":
     import sys
 
-    for k in sys.argv[1:] or ["seattle", "tacoma"]:
-        report(k)
+    args = sys.argv[1:] or ["seattle", "tacoma"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    for k in args:
+        report(k, amen)

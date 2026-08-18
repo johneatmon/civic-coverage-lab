@@ -20,7 +20,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
-from ccl.cities import PROFILES, City, get
+from ccl.cities import PROFILES, Amenity, City, amenity as get_amenity, get
 from ccl.elevation import edge_seconds, fetch_dem, sample
 from ccl.landuse import mask as landuse_mask
 
@@ -29,6 +29,7 @@ DATA = ROOT / "data"
 CRS_M = "EPSG:32610"  # default only; each city carries its own UTM zone
 GRID_M = 150
 SNAP_MAX_M = 250.0
+ACCESS_BUFFER_M = 25.0  # a perimeter sidewalk counts as being at the park
 MIN_DENSITY = 100.0
 ACS_YEAR = 2023
 
@@ -70,31 +71,88 @@ def build_csr(G: nx.MultiDiGraph, nodes: list) -> csr_matrix:
 # ------------------------------------------------------------------ facilities
 
 
-def fetch_facilities(city: City) -> gpd.GeoDataFrame:
-    out = DATA / f"{city.key}_facilities.geojson"
+def fetch_facilities(city: City, am: Amenity) -> gpd.GeoDataFrame:
+    """Facility geometry for one (city, amenity) pair.
+
+    Points are returned as points; polygon amenities keep their polygons, because access
+    is to the boundary, not the centroid.
+    """
+    out = DATA / f"{city.key}_{am.key}.geojson"
     if out.exists():
         return gpd.read_file(out)
-    if city.facility_source in ("arcgis", "arcgis_url"):
-        url = (city.arcgis_url if city.facility_source == "arcgis_url"
-               else f"{ARCGIS_ROOT}/{city.arcgis_service}/FeatureServer/0/query")
-        r = requests.get(
-            url,
-            params={"where": "1=1", "outFields": "*", "outSR": "4326", "f": "geojson"},
-            timeout=90,
-        )
+    spec = am.sources[city.key]
+
+    if spec["kind"] in ("arcgis_service", "arcgis_url"):
+        url = spec.get("url") or f"{ARCGIS_ROOT}/{spec['service']}/FeatureServer/0/query"
+        r = requests.get(url, params={"where": "1=1", "outFields": "*",
+                                      "outSR": "4326", "f": "geojson"}, timeout=300)
         r.raise_for_status()
         gdf = gpd.GeoDataFrame.from_features(r.json()["features"], crs="EPSG:4326")
     else:
-        f = city.osm_filter
-        gdf = ox.features_from_place(city.place, tags=f["tags"]).reset_index()
-        if "website_contains" in f:
+        gdf = ox.features_from_place(city.place, tags=spec["tags"]).reset_index()
+        if "website_contains" in spec:
             web = gdf.get("website", pd.Series(index=gdf.index, dtype=object)).fillna("")
-            gdf = gdf[web.str.contains(f["website_contains"], case=False, na=False)]
-        gdf = gdf[["name", "geometry"]].copy()
-        gdf["geometry"] = gdf.geometry.centroid  # ways -> points
+            gdf = gdf[web.str.contains(spec["website_contains"], case=False, na=False)]
+        if "exclude_access" in spec and "access" in gdf:
+            gdf = gdf[~gdf["access"].isin(spec["exclude_access"])]
+
     gdf = gdf[gdf.geometry.notna() & ~gdf.geometry.is_empty]
+
+    if am.geometry == "polygon":
+        gdf = gdf[gdf.geometry.geom_type.isin(["Polygon", "MultiPolygon"])].to_crs(city.crs)
+        name = next((c for c in ("NAME", "name") if c in gdf.columns), None)
+        if name and "exclude_name" in spec:
+            pat = "|".join(spec["exclude_name"])
+            gdf = gdf[~gdf[name].fillna("").str.upper().str.contains(pat)]
+        if name and spec.get("dissolve"):
+            # parcel-level layers split one park across many rows
+            gdf = gdf.dissolve(by=name, as_index=False)[[name, "geometry"]]
+        gdf = gdf[gdf.geometry.area >= spec.get("min_area_m2", 0.0)]
+        keep = [c for c in (name,) if c] + ["geometry"]
+        gdf = gdf[keep].reset_index(drop=True).to_crs("EPSG:4326")
+    else:
+        gdf = gdf.to_crs(city.crs)
+        gdf["geometry"] = gdf.geometry.centroid
+        name = next((c for c in ("NAME", "name") if c in gdf.columns), None)
+        gdf = gdf[([name] if name else []) + ["geometry"]].reset_index(drop=True)
+        gdf = gdf.to_crs("EPSG:4326")
+
     gdf.to_file(out, driver="GeoJSON")
     return gdf
+
+
+def access_nodes(fac: gpd.GeoDataFrame, am: Amenity, node_xy, tree, crs) -> np.ndarray:
+    """Network nodes that count as being *at* a facility.
+
+    For a point amenity that is the single nearest node. For a polygon it is every node
+    inside the polygon or within ACCESS_BUFFER_M of it -- a park is reachable from any
+    point on its perimeter, and treating it as one centroid would put Point Defiance's
+    access point 800 m into the woods.
+    """
+    if am.geometry != "polygon":
+        _, idx = tree.query(np.column_stack([fac.geometry.x, fac.geometry.y]))
+        return np.unique(idx)
+    nodes = gpd.GeoDataFrame(geometry=gpd.points_from_xy(node_xy[:, 0], node_xy[:, 1]),
+                             crs=crs)
+    buf = gpd.GeoDataFrame(geometry=fac.geometry.buffer(ACCESS_BUFFER_M), crs=crs)
+    hit = gpd.sjoin(nodes, buf, how="inner", predicate="within")
+    if len(hit) == 0:  # tiny parks with no node inside: fall back to nearest node each
+        _, idx = tree.query(np.column_stack([fac.geometry.centroid.x,
+                                             fac.geometry.centroid.y]))
+        return np.unique(idx)
+    return np.unique(hit.index.to_numpy())
+
+
+def straight_line_field(fac: gpd.GeoDataFrame, am: Amenity, xs, ys, crs) -> np.ndarray:
+    """Crow-flies distance to the nearest facility, boundary-aware for polygons."""
+    gx, gy = np.meshgrid(xs, ys)
+    if am.geometry != "polygon":
+        return cKDTree(np.column_stack([fac.geometry.x, fac.geometry.y])).query(
+            np.column_stack([gx.ravel(), gy.ravel()]))[0].reshape(gx.shape)
+    cells = gpd.GeoDataFrame(geometry=gpd.points_from_xy(gx.ravel(), gy.ravel()), crs=crs)
+    near = gpd.sjoin_nearest(cells, fac[["geometry"]], how="left", distance_col="_d")
+    near = near[~near.index.duplicated(keep="first")].reindex(cells.index)
+    return np.nan_to_num(near["_d"].to_numpy(dtype=float)).reshape(gx.shape)
 
 
 # ------------------------------------------------------------------ geography
@@ -270,10 +328,12 @@ def _water_mask(city: City, xs, ys) -> np.ndarray:
 # ------------------------------------------------------------------ assembly
 
 
-def build(city_key: str) -> dict:
-    city = get(city_key)
+def build(city_key: str, amenity_key: str = "libraries") -> dict:
+    city, am = get(city_key), get_amenity(amenity_key)
+    if city_key not in am.sources:
+        raise KeyError(f"no {amenity_key} source configured for {city_key}")
     xs, ys, inside = grid(city)
-    fac = fetch_facilities(city).to_crs(city.crs)
+    fac = fetch_facilities(city, am).to_crs(city.crs)
     G = ox.project_graph(walk_graph(city), to_crs=city.crs)
 
     nodes = list(G.nodes)
@@ -286,16 +346,14 @@ def build(city_key: str) -> dict:
     snap = snap.reshape(gx.shape)
     cell_node = cell_node.reshape(gx.shape).astype(np.int32)
 
-    _, fac_idx = tree.query(np.column_stack([fac.geometry.x, fac.geometry.y]))
-    fac_nodes = np.unique(fac_idx)
+    fac_nodes = access_nodes(fac, am, node_xy, tree, city.crs)
 
     # Flat-distance fields (metres), kept so the slope effect can be isolated.
     # Transposed: a path from a facility in the reversed graph is a path *to* it in the
     # original, which is the direction accessibility is defined in.
     dn = dijkstra(csr.T.tocsr(), indices=fac_nodes, min_only=True)
     network = dn[cell_node] + snap
-    euclid = cKDTree(np.column_stack([fac.geometry.x, fac.geometry.y])).query(
-        np.column_stack([gx.ravel(), gy.ravel()]))[0].reshape(gx.shape)
+    euclid = straight_line_field(fac, am, xs, ys, city.crs)
 
     # Slope-aware travel time (seconds), one field per walker profile.
     dem, transform = fetch_dem(city.key, tuple(boundary(city).to_crs(city.crs).total_bounds),
@@ -337,28 +395,35 @@ def build(city_key: str) -> dict:
         "network": network, "euclidean": euclid, "land": land,
         "inhabited": inhabited, "habitable": habitable,
         "fac_nodes": fac_nodes, "node_xy": node_xy,
+        "n_facilities": np.array(len(fac)),
         "csr_data": csr.data, "csr_indices": csr.indices, "csr_indptr": csr.indptr,
         "csr_shape": np.array(csr.shape), "node_elev": elev, "edge_grade": grade,
         **time_fields,
         **{k: v for k, v in dem_r.items()},
     }
-    np.savez_compressed(DATA / f"city_{city.key}.npz", **payload)
-    return {"city": city, "n_facilities": len(fac), "impassable": impassable, **payload}
+    np.savez_compressed(DATA / f"city_{city.key}_{am.key}.npz", **payload)
+    return {"city": city, "amenity": am, "n_facilities": len(fac),
+            "n_access_nodes": int(fac_nodes.size), "impassable": impassable, **payload}
 
 
-def load(city_key: str) -> dict:
-    return dict(np.load(DATA / f"city_{city_key}.npz", allow_pickle=False))
+def load(city_key: str, amenity_key: str = "libraries") -> dict:
+    return dict(np.load(DATA / f"city_{city_key}_{amenity_key}.npz", allow_pickle=False))
 
 
 if __name__ == "__main__":
     import sys
 
-    for key in sys.argv[1:] or ["seattle", "tacoma"]:
-        r = build(key)
+    args = sys.argv[1:] or ["seattle", "tacoma"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    for key in args:
+        r = build(key, amen)
         c, land, inh = r["city"], r["land"], r["inhabited"]
         pop = r["population"][land].sum()
-        print(f"\n=== {c.place} ===")
-        print(f"  facilities        : {r['n_facilities']}")
+        print(f"\n=== {c.place} — {r['amenity'].label} ===")
+        print(f"  facilities        : {r['n_facilities']} "
+              f"({r['n_access_nodes']:,} access nodes)")
         print(f"  analysed land     : {land.sum() * 0.0225:,.0f} km2 ({land.sum():,} cells)")
         print(f"  population (raster): {pop:,.0f}  vs published {c.pop_reference:,} "
               f"({100 * pop / c.pop_reference - 100:+.1f}%)")

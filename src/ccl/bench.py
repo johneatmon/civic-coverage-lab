@@ -12,7 +12,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
 from ccl.build import load
-from ccl.cities import PROFILES, get
+from ccl.cities import PROFILES, amenity as get_amenity, get
 from ccl.elevation import edge_seconds
 from ccl.persistence import h1_diagram
 
@@ -20,8 +20,9 @@ STRIDE = 3
 CONN4 = ndimage.generate_binary_structure(2, 1)
 
 
-def setup(city_key: str, stride: int = STRIDE) -> dict:
-    d = load(city_key)
+def setup(city_key: str, stride: int = STRIDE,
+          amenity_key: str = "libraries") -> dict:
+    d = load(city_key, amenity_key)
     csr = csr_matrix((d["csr_data"], d["csr_indices"], d["csr_indptr"]),
                      shape=tuple(d["csr_shape"]))
     cand = np.zeros_like(d["inhabited"])
@@ -38,7 +39,7 @@ def setup(city_key: str, stride: int = STRIDE) -> dict:
     return {
         "d": d, "csr": csr, "tcsr": tcsr.T.tocsr(), "cand_rc": rc,
         "cand_nodes": np.array([d["cell_node"][r, c] for r, c in rc], dtype=np.int64),
-        "city": get(city_key),
+        "city": get(city_key), "amenity": get_amenity(amenity_key),
     }
 
 
@@ -175,9 +176,11 @@ def score(s: dict, picks: list, standard: float) -> dict:
     }
 
 
-def results(city_key: str, k: int = 8, minutes: int = 15) -> dict:
+def results(city_key: str, k: int = 8, minutes: int | None = None,
+            amenity_key: str = "libraries") -> dict:
+    s = setup(city_key, amenity_key=amenity_key)
+    minutes = s["amenity"].headline_min if minutes is None else minutes
     standard = minutes * 60.0
-    s = setup(city_key)
     cov = coverage_matrix(s, standard)
 
     strategies = {
@@ -194,12 +197,13 @@ def results(city_key: str, k: int = 8, minutes: int = 15) -> dict:
             "standard": standard, "minutes": minutes, "k": k}
 
 
-def run(city_key: str, k: int = 8, minutes: int = 15) -> dict:
-    R = results(city_key, k, minutes)
+def run(city_key: str, k: int = 8, minutes: int | None = None,
+        amenity_key: str = "libraries") -> dict:
+    R = results(city_key, k, minutes, amenity_key)
     s, base, rows, standard = R["s"], R["base"], R["rows"], R["standard"]
     print(f"\n{'=' * 90}")
     print(f"{s['city'].place.upper()} — siting {k} new branches, "
-          f"{minutes} min adult standard (slope-aware travel time)")
+          f"{R['minutes']} min adult standard (slope-aware travel time)")
     print(f"existing: {len(s['d']['fac_nodes'])} branches · "
           f"candidates: {len(s['cand_nodes'])} sites")
     print(f"{'=' * 90}")
@@ -227,5 +231,9 @@ def run(city_key: str, k: int = 8, minutes: int = 15) -> dict:
 if __name__ == "__main__":
     import sys
 
-    for c in sys.argv[1:] or ["seattle", "tacoma"]:
-        run(c)
+    args = sys.argv[1:] or ["seattle", "tacoma"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    for c in args:
+        run(c, amenity_key=amen)

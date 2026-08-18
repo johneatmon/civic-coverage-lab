@@ -4,12 +4,15 @@ Walking access to civic amenities, measured properly: real street networks, real
 and separate walker profiles — then benchmarked against classical facility-location
 optimisation to see whether the topology the project started from actually helps.
 
-Case studies: Seattle (28 library branches), Tacoma (8), Phoenix (17).
-Narrative version: **[WRITEUP.md](WRITEUP.md)**.
+Case studies: libraries in Seattle (28 branches), Tacoma (8) and Phoenix (17); parks in
+Seattle (254) and Tacoma (126). Narrative version: **[WRITEUP.md](WRITEUP.md)**.
 
 ```bash
-uv run python -m ccl.build seattle tacoma phoenix   # fetch + model
-uv run python -m ccl.report seattle tacoma phoenix  # 8-page PDF per city
+uv run python -m ccl.build seattle tacoma phoenix         # libraries (default)
+uv run python -m ccl.report seattle tacoma phoenix        # 8-page PDF per city
+
+uv run python -m ccl.build parks seattle tacoma           # a different amenity
+uv run python -m ccl.report parks seattle tacoma
 ```
 
 Sample output, from the latest release: [Seattle](https://github.com/johneatmon/civic-coverage-lab/releases/latest/download/report_seattle.pdf) ·
@@ -43,18 +46,11 @@ been superseded. Where the two disagree, this section is right.
 > therefore check the documents against *whatever build is on disk*, so after a rebuild
 > expect a few mismatches and regenerate rather than hunt a bug.
 
-> **Figures are from an OpenStreetMap extract dated 2026-08-17.** OSM is a live dataset:
-> rebuilding re-downloads the walk network and land-use polygons, and edits made since will
-> shift these numbers by roughly a point or two. Exact reproducibility is not achievable
-> here — the three walk graphs alone are 517 MB and cannot be pinned in the repo — so the
-> verifier scripts check the documents against *whatever build is currently on disk*. After
-> a rebuild, expect a handful of mismatches and regenerate rather than assuming a bug.
-
 ## Access
 
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| branches | 28 | 8 | 17 |
+| library branches | 28 | 8 | 17 |
 | residents analysed | 721,942 | 210,290 | 1,522,291 |
 | residents per branch | 25,784 | 26,286 | **89,547** |
 | median walk to a branch | 19 min | 26 min | **53 min** |
@@ -131,6 +127,46 @@ the extremum these rules target is far worse than the bulk — the most remote s
 discriminates where there is more than one gap worth ranking. The largest pocket holds
 40.6% of Seattle's underserved but 90.8% of Tacoma's and 98.4% of Phoenix's, so outside
 Seattle the ranking returns the same pocket every time and is not being measured at all.
+
+
+## Parks — the second amenity
+
+The pipeline takes a `(city, amenity)` pair, not just a city. Parks are the second, measured
+against the **10-minute walk** standard Metro Parks Tacoma adopted and the Trust for Public
+Land campaigns on.
+
+Parks are polygons, and that is load-bearing: you enter a park at its edge. Collapsing one
+to a centroid would put Point Defiance's access point 800 m into the woods. Access nodes are
+therefore every network node inside a park or within 25 m of it — 11,550 of them across
+Seattle's 254 parks, against 28 for its 28 libraries.
+
+| beyond the standard | Seattle libraries (15 min) | Seattle parks (10 min) | Tacoma parks (10 min) |
+|---|---:|---:|---:|
+| adults | 57.4% | **19.6%** | 27.0% |
+| 65+ | 75.1% | 33.9% | 48.8% |
+| ambulatory difficulty | 93.2% | **72.2%** | 70.6% |
+| **mobility gap** (ambulatory − adult) | 36 pts | **53 pts** | 44 pts |
+| no route within a 5% grade | 12,484 | 9,566 | 2,289 |
+
+Parks are far better distributed than libraries — a fifth of Seattle adults are beyond a
+10-minute walk to a park against well over half for a 15-minute walk to a library. **But the
+mobility gap is much wider**, 53 points against 36.
+
+### Why: libraries get the flat land, parks get what is left
+
+| mean walk-segment grade | city-wide | near libraries | near parks |
+|---|---:|---:|---:|
+| Seattle | 3.9% | **3.0%** | **4.7%** |
+| Tacoma | 2.6% | 2.6% | **3.3%** |
+
+A library is a building, and buildings go where building is cheap — Seattle's branches sit
+on land *flatter* than the city average. Parkland is disproportionately what was left over:
+ravines, greenbelts, bluffs, the slopes too steep to develop. So the amenity that is most
+evenly distributed by count is the least evenly accessible by mobility, and the effect is
+strongest exactly where the terrain is worst.
+
+That is a finding you cannot get from a single amenity, and it is the argument for the
+`(city, amenity)` shape.
 
 ## Positioning
 
@@ -820,8 +856,12 @@ what it uniquely offers (enclosed vs. edge), not for extent.
 ## Running it
 
 ```bash
-uv run python -m ccl.build seattle tacoma phoenix    # fetch, model, cache to data/city_<key>.npz
+uv run python -m ccl.build seattle tacoma phoenix    # fetch, model, cache to data/city_<city>_<amenity>.npz
 uv run python -m ccl.report seattle tacoma phoenix   # 8-page PDF per city
+
+# every entry point takes an optional leading amenity ("libraries" default, or "parks")
+uv run python -m ccl.build parks seattle tacoma
+uv run python -m ccl.standards parks tacoma
 
 uv run python -m ccl.standards seattle               # profiles + car access, to stdout
 uv run python -m ccl.ladder                          # radius -> network -> terrain -> profile
@@ -841,7 +881,7 @@ its UTM zone, and where the facility points come from.
 
 | module | role |
 |---|---|
-| `cities` | city config and the walker-speed profiles |
+| `cities` | city config, amenity definitions, and the walker-speed profiles |
 | `build` | the pipeline — facilities, walk graph, elevation, travel-time fields, demand rasters |
 | `elevation` | USGS 3DEP tiles, Tobler speed, per-profile edge cost |
 | `landuse` | OSM mask of large non-residential land, for dasymetric allocation |

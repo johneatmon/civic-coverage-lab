@@ -10,15 +10,16 @@ applies to, which is the point of it.
 import numpy as np
 
 from ccl.build import load
-from ccl.cities import PROFILES, distance_m, get
+from ccl.cities import PROFILES, amenity as get_amenity, distance_m, get
 
 ADULT, MOBILITY = PROFILES[0], PROFILES[2]
-MINUTES = 15
-RADIUS_M = distance_m(ADULT, MINUTES)  # 1,206 m ~ 0.75 mi
 
 
-def rungs(city_key: str) -> list[dict]:
-    d = load(city_key)
+def rungs(city_key: str, amenity_key: str = "libraries") -> list[dict]:
+    am = get_amenity(amenity_key)
+    MINUTES = am.headline_min
+    RADIUS_M = distance_m(ADULT, MINUTES)
+    d = load(city_key, amenity_key)
     m = d["land"]
     pop, amb = d["population"], d["pop_ambulatory"]
     tot, tot_amb = float(pop[m].sum()), float(amb[m].sum())
@@ -51,9 +52,9 @@ def rungs(city_key: str) -> list[dict]:
     return out
 
 
-def main(keys) -> None:
+def main(keys, amenity_key="libraries") -> None:
     for k in keys:
-        rs = rungs(k)
+        rs = rungs(k, amenity_key)
         print(f"\n{'=' * 86}\n{get(k).place.upper()} — how much does each modelling step "
               f"change the answer?\n{'=' * 86}")
         print(f"{'rung':24s}{'measure':34s}{'underserved':>14s}{'step':>10s}")
@@ -70,4 +71,8 @@ def main(keys) -> None:
 
 if __name__ == "__main__":
     import sys
-    main(sys.argv[1:] or ["seattle", "tacoma", "phoenix"])
+    args = sys.argv[1:] or ["seattle", "tacoma", "phoenix"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    main(args, amen)

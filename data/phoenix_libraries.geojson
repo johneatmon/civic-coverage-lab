@@ -1,0 +1,24 @@
+{
+"type": "FeatureCollection",
+"name": "phoenix_libraries",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "NAME": "Palo Verde Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.169625348225949, 33.500428019146739 ] } },
+{ "type": "Feature", "properties": { "NAME": "Mesquite Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -111.983685614340075, 33.604673573594646 ] } },
+{ "type": "Feature", "properties": { "NAME": "Acacia Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.063153321873031, 33.566276881913296 ] } },
+{ "type": "Feature", "properties": { "NAME": "Cholla Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.119799134431815, 33.57805591524572 ] } },
+{ "type": "Feature", "properties": { "NAME": "Saguaro Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -111.982866917484429, 33.478687092580174 ] } },
+{ "type": "Feature", "properties": { "NAME": "Ocotillo Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.074682858437825, 33.392694885812652 ] } },
+{ "type": "Feature", "properties": { "NAME": "Harmon Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.079134053229907, 33.435899463781183 ] } },
+{ "type": "Feature", "properties": { "NAME": "Burton Barr Central Library" }, "geometry": { "type": "Point", "coordinates": [ -112.073182506764596, 33.46223938108939 ] } },
+{ "type": "Feature", "properties": { "NAME": "Cesar Chavez Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.138544768233871, 33.376861678587638 ] } },
+{ "type": "Feature", "properties": { "NAME": "South Mountain Community Library" }, "geometry": { "type": "Point", "coordinates": [ -112.032488121678, 33.382233389908173 ] } },
+{ "type": "Feature", "properties": { "NAME": "Yucca Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.09157247555234, 33.519867232418513 ] } },
+{ "type": "Feature", "properties": { "NAME": "Agave Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.140232635052854, 33.699450727989941 ] } },
+{ "type": "Feature", "properties": { "NAME": "Century Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.043406811344852, 33.505975219674092 ] } },
+{ "type": "Feature", "properties": { "NAME": "Desert Sage Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.223600733656184, 33.473930104087067 ] } },
+{ "type": "Feature", "properties": { "NAME": "Desert Broom Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -111.992339844330743, 33.75446931349525 ] } },
+{ "type": "Feature", "properties": { "NAME": "Ironwood Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -111.989864164118714, 33.304810353678128 ] } },
+{ "type": "Feature", "properties": { "NAME": "Juniper Branch Library" }, "geometry": { "type": "Point", "coordinates": [ -112.098465692989862, 33.654217223453657 ] } }
+]
+}

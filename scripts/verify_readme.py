@@ -6,12 +6,14 @@ numbers record what was true when each phase ran, several under models later cor
 
 import numpy as np
 from scipy import ndimage, stats
+from scipy.sparse import csr_matrix
 
 from ccl.bench import CONN4, field_from, random_picks, results, score
 from ccl.build import load
-from ccl.cities import PROFILES, distance_m
+from ccl.cities import PROFILES, distance_m, get
 from ccl.ladder import rungs
 from ccl.sensitivity import stranded_profile
+from ccl.standards import summary
 
 CITIES = ["seattle", "tacoma", "phoenix"]
 ok = fail = 0
@@ -119,5 +121,30 @@ for c in CITIES:
     lab, n = ndimage.label((bf > std) & d["land"], structure=CONN4)
     pops = np.array(sorted([d["population"][lab == i].sum() for i in range(1, n + 1)])[::-1])
     chk(f"largest pocket share {c}", share[c], 100 * pops[0] / pops.sum(), 0.1)
+
+print("\nPARKS (second amenity)")
+import geopandas as gpd
+from ccl.build import DATA as _D
+park = {"seattle": (254, 19.6, 33.9, 72.2, 9566), "tacoma": (126, 27.0, 48.8, 70.6, 2289)}
+grade = {"seattle": (3.9, 3.0, 4.7), "tacoma": (2.6, 2.6, 3.3)}
+for c, (nf, pa, po, pm, nr) in park.items():
+    Sp = summary(c, "parks")
+    chk(f"park count {c}", nf, Sp["n_facilities"])
+    for p_, cl in zip(PROFILES, (pa, po, pm)):
+        chk(f"parks {p_.key} beyond 10 min {c}", cl, Sp["profiles"][PROFILES.index(p_)][10]["pct"], 0.05)
+    chk(f"parks no route {c}", nr, Sp["profiles"][2][10]["unreachable"], 3)
+    dd = D[c]
+    csr_ = csr_matrix((dd["csr_data"], dd["csr_indices"], dd["csr_indptr"]),
+                      shape=tuple(dd["csr_shape"]))
+    coo_ = csr_.tocoo(); g_ = np.abs(dd["edge_grade"]); nxy = dd["node_xy"]
+    chk(f"city-wide mean grade {c}", grade[c][0], g_.mean() * 100, 0.05)
+    cty = get(c)
+    for i, am_ in enumerate(("libraries", "parks"), start=1):
+        fac = gpd.read_file(_D / f"{c}_{am_}.geojson").to_crs(cty.crs)
+        nodes = gpd.GeoDataFrame(geometry=gpd.points_from_xy(nxy[:, 0], nxy[:, 1]), crs=cty.crs)
+        buf = gpd.GeoDataFrame(geometry=fac.geometry.buffer(150), crs=cty.crs)
+        hit = np.zeros(len(nxy), dtype=bool)
+        hit[gpd.sjoin(nodes, buf, how="inner", predicate="within").index.unique().to_numpy()] = True
+        chk(f"mean grade near {am_} {c}", grade[c][i], g_[hit[coo_.row]].mean() * 100, 0.05)
 
 print(f"\n{'=' * 76}\n  {ok} verified, {fail} MISMATCHED\n{'=' * 76}")

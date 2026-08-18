@@ -13,13 +13,13 @@ OUT = Path(__file__).resolve().parents[2] / "assets"  # committed: README embeds
 COLORS = {10: "#e4572e", 15: "#f5b841"}
 
 
-def plot(city_keys=("seattle", "tacoma")) -> Path:
+def plot(city_keys=("seattle", "tacoma"), amenity_key="libraries") -> Path:
     fig, axes = plt.subplots(1, len(city_keys), figsize=(6.6 * len(city_keys), 6.4),
                              constrained_layout=True, sharex=True)
     axes = np.atleast_1d(axes)
 
     for ax, key in zip(axes, city_keys):
-        d, city = load(key), get(key)
+        d, city = load(key, amenity_key), get(key)
         y = np.arange(len(PROFILES))
         h = 0.36
         for i, minutes in enumerate(TIME_BUDGETS_MIN):
@@ -56,11 +56,13 @@ def plot(city_keys=("seattle", "tacoma")) -> Path:
                  "same policy sentence, different catchment for every kind of walker",
                  fontsize=14, fontweight="bold")
     OUT.mkdir(exist_ok=True)
-    path = OUT / "standards_by_profile.png"
+    path = OUT / (f"standards_by_profile_{amenity_key}.png" if amenity_key != "libraries"
+                  else "standards_by_profile.png")
     fig.savefig(path, dpi=140, bbox_inches="tight")
     plt.close(fig)
     return path
 
 
 if __name__ == "__main__":
-    print(plot())
+    import sys
+    print(plot(amenity_key=(sys.argv[1] if len(sys.argv) > 1 else "libraries")))

@@ -17,7 +17,7 @@ from scipy import ndimage, stats
 from ccl.bench import field_from as bench_field
 from ccl.bench import results as bench_results
 from ccl.build import DATA
-from ccl.cities import PROFILES, TIME_BUDGETS_MIN, get
+from ccl.cities import PROFILES, TIME_BUDGETS_MIN, amenity as get_amenity, get
 from ccl.ladder import rungs as ladder_rungs
 from ccl.sensitivity import stranded_profile
 from ccl.standards import summary
@@ -49,6 +49,18 @@ def _para(fig, y, text, size=9.5, weight="normal", color=INK):
              fontweight=weight, linespacing=1.55)
 
 
+def _draw_facilities(ax, city, am, size=30, edge="black"):
+    """Points get a marker; polygons get their outline — a park scattered as a centroid
+    would put Point Defiance's dot 800 m from anywhere you can walk in."""
+    fac = gpd.read_file(DATA / f"{city.key}_{am.key}.geojson").to_crs(city.crs)
+    if am.geometry == "polygon":
+        fac.plot(ax=ax, facecolor="#00d4ff", edgecolor="#0077a3", linewidth=0.4,
+                 alpha=0.75, zorder=4)
+    else:
+        ax.scatter(fac.geometry.x, fac.geometry.y, s=size, c="#00d4ff", marker="o",
+                   edgecolor=edge, linewidth=0.7, zorder=4)
+
+
 def _map(ax, s, values, title, cmap="magma_r", norm=None, vmax=None, unreachable=None):
     d = s["d"]
     xs, ys = d["xs"], d["ys"]
@@ -62,9 +74,7 @@ def _map(ax, s, values, title, cmap="magma_r", norm=None, vmax=None, unreachable
         ax.imshow(np.where(unreachable, 1.0, np.nan), origin="lower", extent=extent,
                   cmap=ListedColormap(["#00e5ff"]), vmin=0, vmax=1, alpha=0.95,
                   interpolation="nearest")
-    fac = gpd.read_file(DATA / f"{s['city'].key}_facilities.geojson").to_crs(s["city"].crs)
-    ax.scatter(fac.geometry.x, fac.geometry.y, s=30, c="#00d4ff", marker="o",
-               edgecolor="black", linewidth=0.7, zorder=4)
+    _draw_facilities(ax, s["city"], s["amenity"], size=30)
     ax.set_xticks([]); ax.set_yticks([])
     ax.set_title(title, fontsize=10.5, color=INK)
     for sp in ax.spines.values():
@@ -72,20 +82,22 @@ def _map(ax, s, values, title, cmap="magma_r", norm=None, vmax=None, unreachable
     return im
 
 
-def build_report(city_key: str, k: int = 8) -> Path:
-    city = get(city_key)
-    S = summary(city_key)
+def build_report(city_key: str, k: int = 8, amenity_key: str = "libraries") -> Path:
+    city, am = get(city_key), get_amenity(amenity_key)
+    S = summary(city_key, amenity_key)
     d = S["d"]
-    s = {"d": d, "city": city}
+    s = {"d": d, "city": city, "amenity": am}
     adult = PROFILES[0]
+    HL = am.headline_min          # this amenity's own standard, 15 for libraries, 10 for parks
     OUT.mkdir(exist_ok=True)
-    path = OUT / f"report_{city_key}.pdf"
+    path = OUT / (f"report_{city_key}.pdf" if amenity_key == "libraries"
+                  else f"report_{city_key}_{amenity_key}.pdf")
 
     t15 = d[f"time_{adult.key}"] / 60.0
-    covered_pct = 100 * (1 - S["profiles"][0][15]["pct"] / 100)
+    covered_pct = 100 * (1 - S["profiles"][0][HL]["pct"] / 100)
 
     # Siting results are needed by both the benchmark page and the pocket markers.
-    R = bench_results(city_key, k=k)
+    R = bench_results(city_key, k=k, amenity_key=amenity_key)
     sb, cov = R["s"], R["cov"]
     base_cov = ((bench_field(sb, d["fac_nodes"]) <= R["standard"]) & d["inhabited"]).ravel()
     popflat = np.where(d["inhabited"].ravel(), d["population"].ravel(), 0.0)
@@ -113,20 +125,20 @@ def build_report(city_key: str, k: int = 8) -> Path:
     with PdfPages(path) as pdf:
         # ---------------------------------------------------------------- page 1
         fig = plt.figure(figsize=PAGE)
-        fig.text(0.08, 0.88, "Library walking access", fontsize=27, fontweight="bold",
+        fig.text(0.08, 0.88, f"Walking access to {am.label}", fontsize=27, fontweight="bold",
                  color=INK)
         fig.text(0.08, 0.845, city.place, fontsize=15, color=ACCENT)
         fig.add_artist(plt.Line2D([0.08, 0.92], [0.83, 0.83], color=ACCENT, lw=2))
 
-        c = S["profiles"][0][15]
-        m = S["profiles"][2][15]
-        st = stranded_profile(city_key)
+        c = S["profiles"][0][HL]
+        m = S["profiles"][2][HL]
+        st = stranded_profile(city_key, amenity_key)
         headline = [
-            (f"{covered_pct:.0f}%", "of residents can reach a library within a\n"
-                                    "15-minute walk (slope-aware travel time)"),
-            (f"{c['beyond']:,.0f}", "people are beyond that 15-minute standard"),
+            (f"{covered_pct:.0f}%", f"of residents can reach a {am.noun} within a\n"
+                                    f"{HL}-minute walk (slope-aware travel time)"),
+            (f"{c['beyond']:,.0f}", f"people are beyond that {HL}-minute standard"),
             (f"{m['pct']:.0f}%", "of residents with an ambulatory difficulty are\n"
-                                 "beyond a 15-minute walk"),
+                                 f"beyond a {HL}-minute walk"),
             (f"{st['median_min_no_penalty']:.0f} min", "is the median walk faced by the "
                                                        "worst-served of\nthat group — before "
                                                        "any slope penalty at all"),
@@ -139,12 +151,12 @@ def build_report(city_key: str, k: int = 8) -> Path:
             y -= 0.115
 
         _para(fig, 0.26,
-              f"Scope   {S['n_facilities']} library locations · "
+              f"Scope   {S['n_facilities']} {am.label} · "
               f"{d['land'].sum() * 0.0225:,.0f} km² analysed · "
               f"{S['population']:,.0f} residents\n"
               f"Terrain  elevation {S['elev_range'][0]:.0f}–{S['elev_range'][1]:.0f} m · "
               f"{S['grade_steep_pct']:.1f}% of walk segments steeper than the 5% accessible-route grade\n"
-              f"Standard 15-minute neighbourhood goal; 3 mph on the flat = 0.75 mi\n"
+              f"Standard {am.standard_note}\n"
               f"Sources  OpenStreetMap walk network · US Census ACS 5-year 2023 · "
               f"USGS 3DEP elevation", size=10)
         _footer(fig, city, 1); pdf.savefig(fig); plt.close(fig)
@@ -152,8 +164,8 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- ladder
         fig = plt.figure(figsize=PAGE)
         _title(fig, "How you measure changes the answer",
-               "Each step is the same city and the same branches, measured more carefully")
-        rs = ladder_rungs(city_key)
+               f"Each step is the same city and the same {am.label}, measured more carefully")
+        rs = ladder_rungs(city_key, amenity_key)
         ax = fig.add_axes([0.30, 0.55, 0.62, 0.31])
         yy = np.arange(len(rs))
         bars = ax.barh(yy, [r["pct"] for r in rs],
@@ -172,7 +184,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
         gap = rs[2]["pct"] - rs[0]["pct"]
         _para(fig, 0.50,
               f"A straight-line radius — the way service areas are still often drawn — "
-              f"reports {rs[0]['pct']:.0f}% of\nresidents beyond a 15-minute walk. "
+              f"reports {rs[0]['pct']:.0f}% of\nresidents beyond a {HL}-minute walk. "
               f"Routing along real streets and then charging for terrain\nputs it at "
               f"{rs[2]['pct']:.0f}%. "
               f"**Straight-line coverage understates the underserved population here by "
@@ -197,8 +209,8 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- benchmark
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Finding the gaps is not the same as filling them",
-               f"Five strategies for siting {k} new branches, scored on residents brought "
-               f"within 15 minutes")
+               f"Five strategies for siting {k} new {am.label}, scored on residents brought "
+               f"within {HL} minutes")
         names = list(R["rows"])
         gains = [R["rows"][nm]["covered"] - R["base"]["covered"] for nm in names]
         order = np.argsort(gains)[::-1]
@@ -212,7 +224,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
         ax.set_yticks(range(len(names)))
         ax.set_yticklabels([names[i] for i in order], fontsize=8.5)
         ax.invert_yaxis()
-        ax.set_xlabel("additional residents within a 15-minute walk", fontsize=9)
+        ax.set_xlabel(f"additional residents within a {HL}-minute walk", fontsize=9)
         ax.grid(axis="x", alpha=0.25); ax.set_axisbelow(True)
         for b, i in zip(bars, order):
             ax.text(b.get_width() * 1.01, b.get_y() + b.get_height() / 2,
@@ -237,7 +249,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
               f"Persistence marks the most remote point of a gap, and remoteness turns out "
               f"to be a weak guide\nto how many people a branch would reach: across the "
               f"{len(sb['cand_nodes']):,} candidate sites the correlation between\na "
-              f"site's travel time from existing branches and its marginal coverage gain "
+              f"site's travel time from existing {am.label} and its marginal coverage gain "
               f"is only "
               f"{MECH['pearson']:+.2f} (rank\ncorrelation {MECH['spearman']:+.2f}). "
               f"The bulk relationship is weak — but the tail these strategies aim at\nis "
@@ -275,14 +287,14 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- page 2
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Where the walk is long",
-               "Travel time to the nearest library, on foot, accounting for slope")
+               f"Travel time to the nearest {am.noun}, on foot, accounting for slope")
         ax = fig.add_axes([0.08, 0.30, 0.84, 0.575])
         im = _map(ax, s, t15, "", cmap="magma_r", vmax=40)
         cb = fig.colorbar(im, ax=ax, shrink=0.62, pad=0.02)
-        cb.set_label("minutes to nearest library (adult, 3 mph flat)", fontsize=9)
+        cb.set_label(f"minutes to nearest {am.noun} (adult, 3 mph flat)", fontsize=9)
         _para(fig, 0.25,
               f"Median walk is {np.nanmedian(t15[d['inhabited']]):.0f} minutes. "
-              f"Blue dots are the {S['n_facilities']} branches. Darker areas are further "
+              f"Blue marks the {S['n_facilities']} {am.label}. Darker areas are further "
               f"in time, not distance — a\nsteep half-mile costs more than a flat one. "
               f"Areas outside the analysed land mask (open water,\n"
               f"and cells more than 250 m from any mapped pedestrian way) are blank.")
@@ -342,10 +354,10 @@ def build_report(city_key: str, k: int = 8) -> Path:
         im = _map(ax, s, tm, "", cmap="magma_r", vmax=60, unreachable=unreach)
         cb = fig.colorbar(im, ax=ax, shrink=0.62, pad=0.02)
         cb.set_label("minutes at 0.80 m/s, routes at or under a 5% grade", fontsize=9)
-        mob = S["profiles"][2][15]
-        st = stranded_profile(city_key)
+        mob = S["profiles"][2][HL]
+        st = stranded_profile(city_key, amenity_key)
         _para(fig, 0.285,
-              f"Cyan marks land with no route to any library that stays within a 5% "
+              f"Cyan marks land with no route to any {am.noun} that stays within a 5% "
               f"grade: {st['count']:,.0f} residents\nwith an ambulatory difficulty, "
               f"{100 * st['count'] / mob['total']:.0f}% of that group. "
               f"{S['grade_steep_pct']:.1f}% of walk segments are steeper than that.\n\n"
@@ -364,12 +376,12 @@ def build_report(city_key: str, k: int = 8) -> Path:
         # ---------------------------------------------------------------- page 5
         fig = plt.figure(figsize=PAGE)
         _title(fig, "Underserved pockets and best sites",
-               "Contiguous residential areas beyond a 15-minute walk, ranked by "
+               f"Contiguous residential areas beyond a {HL}-minute walk, ranked by "
                "residents affected")
         # Pockets are cut over habitable land only. Including parks, port terminals and
         # airfields would shade land nobody lives on and -- since such places are by
         # construction far from everything -- place the marker in the middle of one.
-        lab, n = ndimage.label((t15 > 15) & d["habitable"],
+        lab, n = ndimage.label((t15 > HL) & d["habitable"],
                                structure=ndimage.generate_binary_structure(2, 1))
         pk = []
         for i in range(1, n + 1):
@@ -408,9 +420,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
         ax.imshow(np.where(ov, 1.0, np.nan), origin="lower",
                   extent=[xs[0], xs[-1], ys[0], ys[-1]], cmap="autumn_r",
                   alpha=0.5, vmin=0, vmax=1.6, interpolation="nearest")
-        fac = gpd.read_file(DATA / f"{city.key}_facilities.geojson").to_crs(city.crs)
-        ax.scatter(fac.geometry.x, fac.geometry.y, s=34, c="#00d4ff", marker="o",
-                   edgecolor="white", lw=0.8, zorder=4)
+        _draw_facilities(ax, city, am, size=34, edge="white")
         for i, p in enumerate(pk[:5], 1):
             ax.annotate(f"{i}", p["xy"], fontsize=9, fontweight="bold", ha="center",
                         bbox=dict(boxstyle="circle,pad=0.24", fc="#ffe680", ec="black",
@@ -432,7 +442,7 @@ def build_report(city_key: str, k: int = 8) -> Path:
             tb[0, j].set_facecolor("#eee"); tb[0, j].set_text_props(fontweight="bold")
         _para(fig, 0.225,
               "Numbered markers are the best available branch site inside each pocket — "
-              "the location that\nbrings the most residents within 15 minutes — chosen "
+              f"the location that\nbrings the most residents within {HL} minutes — chosen "
               "from habitable land only, so parks,\nport terminals and airfields are "
               "never proposed.")
         _para(fig, 0.155, "These are not real parcels.", size=9.5, weight="bold")
@@ -501,5 +511,9 @@ def build_report(city_key: str, k: int = 8) -> Path:
 if __name__ == "__main__":
     import sys
 
-    for c in sys.argv[1:] or ["seattle", "tacoma"]:
-        print(build_report(c))
+    args = sys.argv[1:] or ["seattle", "tacoma", "phoenix"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    for c in args:
+        print(build_report(c, amenity_key=amen))

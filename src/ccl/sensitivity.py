@@ -19,7 +19,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse.csgraph import dijkstra
 
 from ccl.build import load
-from ccl.cities import PROFILES, get
+from ccl.cities import PROFILES, amenity as get_amenity, get
 from ccl.elevation import speed
 
 MOBILITY = PROFILES[2]
@@ -48,8 +48,9 @@ def time_field(d, csr, coo, flat_mps, max_grade, penalty=np.inf):
     return np.where(d["land"], tn[d["cell_node"]] + d["snap"] / flat_mps, np.inf)
 
 
-def analyse(city_key: str) -> None:
-    city, d = get(city_key), load(city_key)
+def analyse(city_key: str, amenity_key: str = "libraries") -> None:
+    city, d = get(city_key), load(city_key, amenity_key)
+    budget = get_amenity(amenity_key).headline_min * 60.0
     csr = csr_matrix((d["csr_data"], d["csr_indices"], d["csr_indptr"]),
                      shape=tuple(d["csr_shape"]))
     coo = csr.tocoo()
@@ -69,8 +70,8 @@ def analyse(city_key: str) -> None:
         f = time_field(d, csr, coo, MOBILITY.speed_mps, g)
         blocked = 0.0 if g is None else 100 * float((np.abs(grade) > g).mean())
         nor = float(pop[land & ~np.isfinite(f)].sum())
-        b15 = float(pop[land & ~(f <= 900)].sum())
-        b30 = float(pop[land & ~(f <= 1800)].sum())
+        b15 = float(pop[land & ~(f <= budget)].sum())
+        b30 = float(pop[land & ~(f <= 2 * budget)].sum())
         if g == HEADLINE:
             base_stranded = land & ~np.isfinite(f)
         print(f"{GRADE_LABEL[g]:>16s}{blocked:>14.1f}%{nor:>10,.0f}"
@@ -83,8 +84,8 @@ def analyse(city_key: str) -> None:
     for p in PENALTIES:
         f = time_field(d, csr, coo, MOBILITY.speed_mps, HEADLINE, p)
         nor = float(pop[land & ~np.isfinite(f)].sum())
-        b15 = float(pop[land & ~(f <= 900)].sum())
-        b30 = float(pop[land & ~(f <= 1800)].sum())
+        b15 = float(pop[land & ~(f <= budget)].sum())
+        b30 = float(pop[land & ~(f <= 2 * budget)].sum())
         lab = "inf (hard)" if np.isinf(p) else f"{p}x"
         print(f"{lab:>16s}{nor:>10,.0f}{100 * nor / total:>4.0f}%"
               f"{b15:>11,.0f}{100 * b15 / total:>5.0f}%"
@@ -120,14 +121,14 @@ def analyse(city_key: str) -> None:
 
 
 
-def stranded_profile(city_key: str) -> dict:
+def stranded_profile(city_key: str, amenity_key: str = "libraries") -> dict:
     """Compact summary for the report: how robust is the 'no route' finding?
 
     Returns the ADA-cutoff stranded count, the range of that count across plausible
     thresholds, and what the stranded cohort faces with NO slope penalty at all -- the
     most generous assumption available.
     """
-    d = load(city_key)
+    d = load(city_key, amenity_key)
     csr = csr_matrix((d["csr_data"], d["csr_indices"], d["csr_indptr"]),
                      shape=tuple(d["csr_shape"]))
     coo = csr.tocoo()
@@ -157,5 +158,9 @@ def stranded_profile(city_key: str) -> dict:
 if __name__ == "__main__":
     import sys
 
-    for k in sys.argv[1:] or ["seattle", "tacoma"]:
-        analyse(k)
+    args = sys.argv[1:] or ["seattle", "tacoma"]
+    amen = "libraries"
+    if args and args[0] in ("libraries", "parks"):
+        amen, args = args[0], args[1:]
+    for k in args:
+        analyse(k, amen)
