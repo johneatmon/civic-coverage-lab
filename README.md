@@ -126,50 +126,17 @@ not locally observed; travel time is one-way.
 # Development log
 
 **These sections are a changelog, not current results.** Each records what was true when it
-was written, including several findings later corrected — the grade threshold (phase 5–6
-used 8.33%, which was wrong), population allocation (phases 1–7 smeared residents across
-parks), and the phase-1 magnitude (see the note below). They are kept because the
-corrections are the most instructive part of the project. For current numbers see above.
+was written, including findings later corrected — the grade threshold (phases 5–6 used
+8.33%, the limit for a ramp, as if it were the limit for a pedestrian route) and population
+allocation (earlier phases smeared residents across parks and port land). They are kept
+because the corrections are the most instructive part of the project. For current numbers
+see above.
 
-## Phase 1 — the geometric gate
-
-**Question:** if the holes barely move under a network metric, the thesis is dead and
-there is nothing to build.
-
-**Verdict: passes emphatically.** The two metrics do not merely relocate holes — they
-disagree about whether holes exist at all.
-
-> **Superseded, and this one weakened.** These figures predate the TIGER water mask added
-> in phase 2, so the network column included holes centred on Lake Washington's floating
-> bridges. Recomputed on the current build the comparison is Euclidean **11 holes /
-> 10,719 m** total persistence against network **20 / 25,508 m** — bottleneck distance
-> 1,839 m. The direction survives (roughly 2× the holes, 2.4× the total persistence) but
-> the original "15× more" and "Euclidean finds essentially nothing" framing did not: once
-> the water artifacts are removed, Euclidean does find real holes. The load-bearing version
-> of this result is the measurement ladder in *Current results*, which is stated in people
-> rather than persistence and does not depend on the topology at all.
-
-| | Euclidean | Walk network |
-|---|---:|---:|
-| H1 holes (persistence ≥ 300 m) | 3 | **32** |
-| Most persistent hole | 1,053 m | **8,081 m** |
-| Total persistence | 1,778 m | **50,988 m** |
-| Bottleneck distance between diagrams | | **4,041 m** |
-
-![coverage holes](out/holes_libraries.png)
-
-### Confounds ruled out
-
-**Just a rescaling?** No. Scaling the Euclidean field by the observed mean detour ratio
-(1.47) gives 5 holes / 3,346 m. The network gives 32 / 50,988 m — 15× more.
-
-**Just the noise threshold?** No — the gap *widens* as it rises. At every threshold
-≥ 2,000 m the Euclidean field has **zero** holes while the network still has 8.
-
-| min persistence | 300 m | 500 m | 1 km | 2 km | 3 km | 5 km |
-|---|---:|---:|---:|---:|---:|---:|
-| Euclidean | 3 | 1 | 1 | 0 | 0 | 0 |
-| Network | 32 | 24 | 19 | 8 | 2 | 1 |
+The project opened with a persistent-homology comparison of Euclidean against network
+distance. It is not reproduced here: its headline magnitude turned out to be inflated by
+holes centred on Lake Washington's floating bridges, which the water mask added one phase
+later removed. The question it was asking is answered properly by the measurement ladder in
+*Current results* — in people rather than persistence, and without the topology.
 
 ## Phase 2 — demand weighting
 
