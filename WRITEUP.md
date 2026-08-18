@@ -17,9 +17,9 @@ residents brought within a 15-minute walk:
 
 | strategy | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| **Greedy MCLP** (Church & ReVelle, 1974) | **+84,673** | **+51,174** | **+86,538** |
+| **Greedy MCLP** (Church & ReVelle, 1974) | **+84,183** | **+50,304** | **+86,538** |
 | random placement (mean of 30 draws) | +33,845 | +21,918 | +24,453 |
-| PH ranked by persistence | +25,037 | +10,368 | +12,462 |
+| PH ranked by persistence | +23,096 | +9,333 | +12,462 |
 | PH ranked by population | +16,409 | +22,563 | +7,283 |
 | worst-served point (no topology) | +5,139 | +6,507 | +4,722 |
 
@@ -28,13 +28,13 @@ strategy against the whole distribution of 30 random draws:
 
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| PH by persistence beats… | 16.7% of random draws | 0.0% | 0.0% |
+| PH by persistence beats… | 6.7% of random draws | 0.0% | 0.0% |
 | PH by population beats… | 0.0% | 63.3% | 0.0% |
 
 Five of those six land below almost every random draw. The sixth sits near the middle of
 the random distribution, which is what *no signal* looks like rather than a win. Meanwhile
 greedy MCLP falls outside the random range entirely in all three cities — Seattle's best of
-30 random draws was +49,921 against MCLP's +84,673.
+30 random draws was +49,921 against MCLP's +84,183.
 
 **Topological holes are a diagnostic, not an optimiser.**
 
@@ -45,7 +45,7 @@ that remoteness is a weak guide to how many people a branch would reach — and 
 places these rules aim at are far worse than weak.
 
 Across the candidate pool the correlation between a site's travel time from existing
-branches and its marginal coverage gain is small and not even consistent in sign: **+0.01
+branches and its marginal coverage gain is small and not even consistent in sign: **+0.02
 in Seattle, −0.13 in Tacoma, −0.26 in Phoenix** (rank correlations +0.19, −0.02, −0.25).
 Remoteness explains at most about 7% of the variance in gain anywhere, and in Seattle
 essentially none.
@@ -63,7 +63,7 @@ draws from its emptiest corner.
 ### The counterintuitive part, and where it stops
 
 In Seattle, weighting the holes by population made things *worse* (+16,409 against
-+25,037). My first guess was that it selects small dense pockets with little room to gain.
++23,096). My first guess was that it selects small dense pockets with little room to gain.
 The data says the opposite: it picks the **largest** pockets — median pocket population
 168,663, against 67,639 for the persistence ranking.
 
@@ -95,11 +95,11 @@ ladder, same city, same branches, each rung measured more carefully:
 |---|---|---:|
 | 1. Straight-line radius | 1,206 m as the crow flies | 35.8% |
 | 2. + street network | 1,206 m along the walk graph | 55.4% (+19.7 pp) |
-| 3. + terrain | 15 min at 3 mph, slope-adjusted | 57.5% (+2.1 pp) |
-| 4. + mobility profile | 15 min at 0.80 m/s, 5% max grade | 92.5% |
+| 3. + terrain | 15 min at 3 mph, slope-adjusted | 57.5% (+1.9 pp) |
+| 4. + mobility profile | 15 min at 0.80 m/s, 5% max grade | 93.2% |
 
 **Straight-line coverage understates Seattle's underserved population by 21.7 points —
-156,787 people.** That is the number a service-area map drawn with circles gets wrong.
+155,907 people.** That is the number a service-area map drawn with circles gets wrong.
 
 The network step is the big one, and it is not about Seattle's hills. Phoenix — flat, and
 famous for its grid — has a *higher* median detour ratio (1.35) than Seattle (1.32),
@@ -115,23 +115,23 @@ for every kind of walker, and each distance applies to a different population:
 |---|---:|---:|---:|
 | Adult (planning standard) | 1.34 m/s | 1,206 m | 57.5% |
 | Older adult (65+) | 1.00 m/s | 900 m | 75.0% |
-| Ambulatory difficulty | 0.80 m/s | 720 m | **92.5%** |
+| Ambulatory difficulty | 0.80 m/s | 720 m | **93.2%** |
 
 Seattle meets its 15-minute goal for 43% of adults and 7% of residents with an ambulatory
 difficulty. Same sentence in the comprehensive plan, two different cities.
 
 Terrain is what separates those rows. Adding slope moves the adult figure about **2
-points** and the ambulatory-difficulty figure **12**. Nearly the entire cost of Seattle's
+points** and the ambulatory-difficulty figure **13**. Nearly the entire cost of Seattle's
 topography is paid by one group.
 
 ### A finding that survives its own fragile number
 
 Under the accessible-route grade — 1:20, or 5%, per the 2010 ADA Standards and PROWAG
-R302.4.1 — **12,736 Seattle residents with an ambulatory difficulty have no route to any
+R302.4.1 — **12,484 Seattle residents with an ambulatory difficulty have no route to any
 library that stays within grade.** That is 46% of them.
 
 That count is fragile. Move the threshold across its defensible range (4%–15%) and it
-swings from 18,925 to 966. It should never be quoted alone.
+swings from 19,775 to 1,057. It should never be quoted alone.
 
 Two things underneath it are not fragile. Replace the hard cutoff with a graded penalty
 and nobody is stranded — but the same cohort still faces a **median 41-minute walk with no
@@ -192,3 +192,8 @@ municipal open data.
 Every figure above is re-derived from a fresh run by
 [`scripts/verify_writeup.py`](scripts/verify_writeup.py) — 63 assertions, all passing
 against the current build.
+
+Figures come from an OpenStreetMap extract dated 2026-08-17. OSM is live, so rebuilding
+shifts them by a point or two; the three walk graphs are 517 MB and cannot be pinned, so
+the verifier checks the document against whatever build is on disk rather than against a
+frozen snapshot.

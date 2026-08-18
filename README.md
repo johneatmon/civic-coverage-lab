@@ -24,6 +24,13 @@ Everything in this section is re-derived from the current build by
 **changelog** — its numbers are as-of the phase that produced them and several have since
 been superseded. Where the two disagree, this section is right.
 
+> **Figures are from an OpenStreetMap extract dated 2026-08-17.** OSM is a live dataset:
+> rebuilding re-downloads the walk network and land-use polygons, and edits made since will
+> shift these numbers by roughly a point or two. Exact reproducibility is not achievable
+> here — the three walk graphs alone are 517 MB and cannot be pinned in the repo — so the
+> verifier scripts check the documents against *whatever build is currently on disk*. After
+> a rebuild, expect a handful of mismatches and regenerate rather than assuming a bug.
+
 ## Access
 
 | | Seattle | Tacoma | Phoenix |
@@ -34,7 +41,7 @@ been superseded. Where the two disagree, this section is right.
 | median walk to a branch | 19 min | 26 min | **53 min** |
 | adults beyond a 15-min walk | 57.5% | 79.5% | **95.0%** |
 | 65+ beyond a 15-min walk | 75.0% | 89.5% | 97.4% |
-| ambulatory difficulty beyond a 15-min walk | **92.5%** | **95.4%** | **98.5%** |
+| ambulatory difficulty beyond a 15-min walk | **93.2%** | **95.4%** | **98.5%** |
 
 ## How you measure changes the answer
 
@@ -45,9 +52,9 @@ fixed; rung 4 changes both the model and the population it applies to.
 |---|---:|---:|---:|
 | 1. straight-line radius, 1,206 m | 35.8% | 62.5% | 89.9% |
 | 2. + street network | 55.4% (+19.7) | 79.2% (+16.7) | 95.0% (+5.1) |
-| 3. + terrain | 57.5% (+2.1) | 79.5% (+0.4) | 95.0% (+0.0) |
-| 4. + mobility profile | 92.5% | 95.4% | 98.5% |
-| **straight-line understates by** | **21.7 pts / 156,787** | 17.0 pts / 35,775 | 5.2 pts / 78,795 |
+| 3. + terrain | 57.5% (+1.9) | 79.5% (+0.4) | 95.0% (+0.0) |
+| 4. + mobility profile | 93.2% | 95.4% | 98.5% |
+| **straight-line understates by** | **21.7 pts / 155,907** | 17.0 pts / 35,775 | 5.2 pts / 78,795 |
 
 The network step is large everywhere, including flat gridded Phoenix — a grid forces
 Manhattan travel at ~1.3× straight-line regardless of terrain. Median detour ratio:
@@ -57,12 +64,12 @@ Seattle 1.32, Tacoma 1.35, Phoenix 1.35.
 
 | | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| walk segments steeper than the 5% accessible-route grade | 24.5% | 14.2% | 1.9% |
-| residents with no route to a branch within a 5% grade | **12,736** (46%) | 3,391 (24%) | 1,063 (1.3%) |
+| walk segments steeper than the 5% accessible-route grade | 24.6% | 14.4% | 1.9% |
+| residents with no route to a branch within a 5% grade | **12,484** (46%) | 3,087 (22%) | 1,063 (1.3%) |
 
-Adding terrain moves the adult figure ~2 points and the ambulatory-difficulty figure ~12.
+Adding terrain moves the adult figure ~2 points and the ambulatory-difficulty figure ~13.
 Nearly the whole cost of topography falls on one group. The no-route count is
-threshold-sensitive (966–18,925 across 4–15% cutoffs in Seattle) and should not be quoted
+threshold-sensitive (1,057–19,775 across 4–15% cutoffs in Seattle) and should not be quoted
 alone; under a graded penalty instead of a cutoff nobody is stranded, yet the same cohort
 still faces a median 41-minute walk with no slope penalty applied at all.
 
@@ -86,18 +93,18 @@ minutes.
 
 | strategy | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| **greedy MCLP** | **+84,673** | **+51,174** | **+86,538** |
+| **greedy MCLP** | **+84,183** | **+50,304** | **+86,538** |
 | random (mean of 30 draws) | +33,845 | +21,918 | +24,453 |
-| PH by persistence | +25,037 | +10,368 | +12,462 |
+| PH by persistence | +23,096 | +9,333 | +12,462 |
 | PH by population | +16,409 | +22,563 | +7,283 |
 | worst-served point (no topology) | +5,139 | +6,507 | +4,722 |
 
-Against the full random distribution rather than its mean, PH by persistence beats 16.7% /
+Against the full random distribution rather than its mean, PH by persistence beats 6.7% /
 0.0% / 0.0% of 30 draws and PH by population 0.0% / 63.3% / 0.0%. Five of six sit below
 almost every random draw; the sixth sits mid-distribution, which is absence of signal
 rather than a win. MCLP falls outside the random range entirely in all three cities.
 
-**Why:** remoteness is a weak guide to coverage gain (Pearson +0.01 / −0.13 / −0.26) and
+**Why:** remoteness is a weak guide to coverage gain (Pearson +0.02 / −0.13 / −0.26) and
 the extremum these rules target is far worse than the bulk — the most remote site gains
 477 / 66 / 91 residents against pool medians of 3,575 / 2,699 / 2,847, i.e. 13% / 2% / 3%.
 
@@ -627,11 +634,11 @@ now does it, and the headline number is the one a planner or journalist would ac
 |---|---|---:|
 | 1. Straight-line radius | 1,206 m as the crow flies | 35.8% |
 | 2. + street network | 1,206 m along the walk graph | 55.4% (+19.7 pp) |
-| 3. + terrain | 15 min at 3 mph, slope-adjusted | 57.5% (+2.1 pp) |
-| 4. + mobility profile | 15 min at 0.80 m/s, 5% max grade | 92.5% |
+| 3. + terrain | 15 min at 3 mph, slope-adjusted | 57.5% (+1.9 pp) |
+| 4. + mobility profile | 15 min at 0.80 m/s, 5% max grade | 93.2% |
 
 **Straight-line coverage understates Seattle's underserved population by 21.7 points —
-156,787 people.** Tacoma: 17.0 points. Phoenix: 5.2 points (compressed only because Phoenix
+155,907 people.** Tacoma: 17.0 points. Phoenix: 5.2 points (compressed only because Phoenix
 starts at 89.9% underserved by radius, leaving little headroom).
 
 ### Why distance-driven siting loses — measured across all three cities

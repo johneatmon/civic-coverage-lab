@@ -38,7 +38,7 @@ for c, br, pop, rpb, med in [("seattle", 28, 721942, 25784, 19),
     chk(f"residents per branch {c}", rpb, d["population"][m].sum() / int(d["fac_nodes"].size), 2)
     chk(f"median walk {c}", med, np.median(d["time_adult"][d["inhabited"]] / 60.0), 0.5)
 
-pcts = {"seattle": (57.5, 75.0, 92.5), "tacoma": (79.5, 89.5, 95.4),
+pcts = {"seattle": (57.5, 75.0, 93.2), "tacoma": (79.5, 89.5, 95.4),
         "phoenix": (95.0, 97.4, 98.5)}
 for c in CITIES:
     d, m = D[c], D[c]["land"]
@@ -48,7 +48,7 @@ for c in CITIES:
             100 * d[p.pop_field][m & ~(d[f"time_{p.key}"] <= 900)].sum() / tot, 0.05)
 
 print("\nLADDER")
-lad = {"seattle": (35.8, 55.4, 57.5, 92.5, 21.7, 156787),
+lad = {"seattle": (35.8, 55.4, 57.5, 93.2, 21.7, 155907),
        "tacoma": (62.5, 79.2, 79.5, 95.4, 17.0, 35775),
        "phoenix": (89.9, 95.0, 95.0, 98.5, 5.2, 78795)}
 for c in CITIES:
@@ -59,7 +59,7 @@ for c in CITIES:
     chk(f"understates people {c}", lad[c][5], rs[2]["n"] - rs[0]["n"], 5)
 
 print("\nTERRAIN / CAR ACCESS")
-terr = {"seattle": (24.5, 12736, 46), "tacoma": (14.2, 3391, 24), "phoenix": (1.9, 1063, 1.3)}
+terr = {"seattle": (24.6, 12484, 46), "tacoma": (14.4, 3087, 22), "phoenix": (1.9, 1063, 1.3)}
 car = {"seattle": (38.1, 58.6), "tacoma": (72.1, 80.0), "phoenix": (92.4, 94.7)}
 det = {"seattle": 1.32, "tacoma": 1.35, "phoenix": 1.35}
 for c in CITIES:
@@ -79,12 +79,12 @@ for c in CITIES:
     w = d["population"][mm]
     o = np.argsort(r)
     chk(f"median detour {c}", det[c], r[o][np.searchsorted(np.cumsum(w[o]) / w.sum(), 0.5)], 0.005)
-chk("Seattle threshold range low", 966, stranded_profile("seattle")["range"][0], 3)
-chk("Seattle threshold range high", 18925, stranded_profile("seattle")["range"][1], 3)
+chk("Seattle threshold range low", 1057, stranded_profile("seattle")["range"][0], 3)
+chk("Seattle threshold range high", 19775, stranded_profile("seattle")["range"][1], 3)
 chk("Seattle median walk, no penalty", 41, stranded_profile("seattle")["median_min_no_penalty"], 0.5)
 
 print("\nSITING BENCHMARK")
-bench = {"MCLP greedy": [84673, 51174, 86538], "PH by persistence": [25037, 10368, 12462],
+bench = {"MCLP greedy": [84183, 50304, 86538], "PH by persistence": [23096, 9333, 12462],
          "PH by population": [16409, 22563, 7283],
          "worst-point (no topology)": [5139, 6507, 4722]}
 for nm, vals in bench.items():
@@ -92,8 +92,8 @@ for nm, vals in bench.items():
         chk(f"{nm[:22]} {c}", v, R[c]["rows"][nm]["covered"] - R[c]["base"]["covered"], 1)
 
 rnd = {"seattle": 33845, "tacoma": 21918, "phoenix": 24453}
-pct = {"seattle": (16.7, 0.0), "tacoma": (0.0, 63.3), "phoenix": (0.0, 0.0)}
-corr = {"seattle": 0.01, "tacoma": -0.13, "phoenix": -0.26}
+pct = {"seattle": (6.7, 0.0), "tacoma": (0.0, 63.3), "phoenix": (0.0, 0.0)}
+corr = {"seattle": 0.02, "tacoma": -0.13, "phoenix": -0.26}
 med_g = {"seattle": 3575, "tacoma": 2699, "phoenix": 2847}
 wp_g = {"seattle": 477, "tacoma": 66, "phoenix": 91}
 share = {"seattle": 40.6, "tacoma": 90.8, "phoenix": 98.4}

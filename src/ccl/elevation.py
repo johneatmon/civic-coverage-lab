@@ -33,18 +33,33 @@ TILE_PX = 1800  # per-tile request size; the service 500s well below its nominal
 TOBLER_FLAT = np.exp(-3.5 * 0.05)  # Tobler's value at zero grade, for renormalising
 
 
-def _tile(minx, miny, maxx, maxy, w, h, crs_epsg, attempts=3):
+def _tile(minx, miny, maxx, maxy, w, h, crs_epsg, attempts=6):
+    """Fetch one DEM tile, retrying with exponential backoff.
+
+    3DEP is a public service under variable load and returns 504s under it. The retry has
+    to be patient rather than quick: a gateway timeout means the request is queued, so
+    hammering it every two seconds makes things worse. Backoff runs 4s, 8s, 16s, 32s, 64s.
+    """
+    last = None
     for i in range(attempts):
-        r = requests.get(SERVICE, params={
-            "bbox": f"{minx},{miny},{maxx},{maxy}", "bboxSR": crs_epsg,
-            "size": f"{w},{h}", "imageSR": crs_epsg, "format": "tiff",
-            "pixelType": "F32", "interpolation": "RSP_BilinearInterpolation", "f": "image",
-        }, timeout=600)
-        if r.status_code == 200 and r.headers.get("content-type", "").startswith("image"):
-            with rasterio.open(io.BytesIO(r.content)) as ds:
-                return ds.read(1).astype(np.float64)
-        time.sleep(2 * (i + 1))
-    raise RuntimeError(f"3DEP tile failed after {attempts} attempts: HTTP {r.status_code}")
+        try:
+            r = requests.get(SERVICE, params={
+                "bbox": f"{minx},{miny},{maxx},{maxy}", "bboxSR": crs_epsg,
+                "size": f"{w},{h}", "imageSR": crs_epsg, "format": "tiff",
+                "pixelType": "F32", "interpolation": "RSP_BilinearInterpolation",
+                "f": "image",
+            }, timeout=900)
+            if r.status_code == 200 and r.headers.get("content-type", "").startswith("image"):
+                with rasterio.open(io.BytesIO(r.content)) as ds:
+                    return ds.read(1).astype(np.float64)
+            last = f"HTTP {r.status_code}"
+        except requests.RequestException as e:
+            last = type(e).__name__
+        if i + 1 < attempts:
+            wait = 4 * 2 ** i
+            print(f"    3DEP {last}, retrying in {wait}s ({i + 1}/{attempts - 1})", flush=True)
+            time.sleep(wait)
+    raise RuntimeError(f"3DEP tile failed after {attempts} attempts: {last}")
 
 
 def fetch_dem(city_key: str, bounds: tuple, crs_epsg: int = 32610) -> tuple:
