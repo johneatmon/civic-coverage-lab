@@ -9,7 +9,7 @@ from ccl.build import load
 from ccl.cities import PROFILES, TIME_BUDGETS_MIN, distance_m, get
 from ccl.standards import time_underserved
 
-OUT = Path(__file__).resolve().parents[2] / "out"
+OUT = Path(__file__).resolve().parents[2] / "assets"  # committed: README embeds it
 COLORS = {10: "#e4572e", 15: "#f5b841"}
 
 

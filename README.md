@@ -12,8 +12,8 @@ uv run python -m ccl.build seattle tacoma phoenix   # fetch + model
 uv run python -m ccl.report seattle tacoma phoenix  # 8-page PDF per city
 ```
 
-Sample output: [Seattle](out/report_seattle.pdf) · [Tacoma](out/report_tacoma.pdf) ·
-[Phoenix](out/report_phoenix.pdf)
+Sample output, from the latest release: [Seattle](https://github.com/johneatmon/civic-coverage-lab/releases/latest/download/report_seattle.pdf) ·
+[Tacoma](https://github.com/johneatmon/civic-coverage-lab/releases/latest/download/report_tacoma.pdf) · [Phoenix](https://github.com/johneatmon/civic-coverage-lab/releases/latest/download/report_phoenix.pdf)
 
 ---
 
@@ -293,7 +293,7 @@ applies to a *different population*, not a share of the whole city.
 | Older adult (65+) | 1.00 m/s | 600 m | 900 m | gait-speed literature; MUTCD uses 1.07 m/s where older pedestrians are present |
 | Ambulatory difficulty | 0.80 m/s | 480 m | 720 m | manual wheelchair / walking-aid speeds |
 
-![standards by profile](out/standards_by_profile.png)
+![standards by profile](assets/standards_by_profile.png)
 
 Share of each group beyond a walk to the nearest library, network distance:
 
@@ -801,7 +801,7 @@ uv run python -m ccl.standards seattle               # profiles + car access, to
 uv run python -m ccl.ladder                          # radius -> network -> terrain -> profile
 uv run python -m ccl.bench seattle                   # siting benchmark
 uv run python -m ccl.sensitivity seattle             # grade-threshold sensitivity
-uv run python -m ccl.viz_standards                   # out/standards_by_profile.png
+uv run python -m ccl.viz_standards                   # assets/standards_by_profile.png
 ```
 
 Needs `CENSUS_DATA_API_KEY` in `.env`
