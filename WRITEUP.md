@@ -7,7 +7,8 @@ scale at once and reports the gaps that persist. I liked it enough to build on i
 
 So I did, on library access in Seattle, Tacoma and Phoenix. Topology found the holes. Then
 I benchmarked it against classical operations research on the decision the holes are
-supposed to inform — *where should the next branch go?* — and it lost to random guessing.
+supposed to inform — *where should the next branch go?* — and it could not beat random
+guessing.
 
 ## The benchmark
 
@@ -16,13 +17,26 @@ residents brought within a 15-minute walk:
 
 | strategy | Seattle | Tacoma | Phoenix |
 |---|---:|---:|---:|
-| **Greedy MCLP** (Church & ReVelle, 1974) | **+84,673** | **+49,620** | **+85,176** |
-| random placement (mean of 5 draws) | +33,679 | +18,080 | +21,472 |
-| PH ranked by persistence | +25,037 | +3,363 | +10,060 |
-| PH ranked by population | +16,409 | +8,550 | +5,813 |
-| worst-served point (no topology) | +5,139 | +1,389 | +5,454 |
+| **Greedy MCLP** (Church & ReVelle, 1974) | **+84,673** | **+51,174** | **+86,538** |
+| random placement (mean of 30 draws) | +33,845 | +21,918 | +24,453 |
+| PH ranked by persistence | +25,037 | +10,368 | +12,462 |
+| PH ranked by population | +16,409 | +22,563 | +7,283 |
+| worst-served point (no topology) | +5,139 | +6,507 | +4,722 |
 
-Three cities, one verdict. **Topological holes are a diagnostic, not an optimiser.**
+A single point estimate against random is a weak comparison, so here is each topological
+strategy against the whole distribution of 30 random draws:
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| PH by persistence beats… | 16.7% of random draws | 0.0% | 0.0% |
+| PH by population beats… | 0.0% | 63.3% | 0.0% |
+
+Five of those six land below almost every random draw. The sixth sits near the middle of
+the random distribution, which is what *no signal* looks like rather than a win. Meanwhile
+greedy MCLP falls outside the random range entirely in all three cities — Seattle's best of
+30 random draws was +49,921 against MCLP's +84,673.
+
+**Topological holes are a diagnostic, not an optimiser.**
 
 ## Why it loses
 
@@ -58,17 +72,17 @@ branch at the worst-served *point inside that region*. A larger region has a mor
 extremum, so the weighting selects a better neighbourhood and then a worse corner of it.
 The population signal never survives the trip to the decision.
 
-**This does not replicate, and the reason is the interesting part.** In Tacoma the ordering
-flips (+8,550 for population against +3,363 for persistence). Ranking gaps by population
-only means anything if there is more than one gap worth ranking — and the largest single
-pocket holds 40.6% of Seattle's underserved residents but **90.8% of Tacoma's and 98.4% of
-Phoenix's**. Where one mega-pocket contains nearly everyone, the ranking returns the same
-pocket every time, the strategy collapses to "worst-served point of the one big gap", and
-the comparison between the two PH variants is noise.
+**That reasoning only applies to Seattle, and the reason is the interesting part.** Ranking
+gaps by population means something only if there is more than one gap worth ranking. The
+largest single pocket holds 40.6% of Seattle's underserved residents — but **90.8% of
+Tacoma's and 98.4% of Phoenix's**. Where one mega-pocket contains nearly everyone, the
+ranking returns the same pocket every time and the strategy collapses to "worst-served
+point of the one big gap"; whatever the two PH variants score there is not measuring the
+ranking at all.
 
 Which is itself a finding about the method: population-weighting a topological gap ranking
 only has purchase in cities whose underserved population is genuinely fragmented. In the
-sprawl case it degenerates.
+sprawl case it degenerates, and any comparison built on it is unstable.
 
 ## Where topology did earn its keep
 

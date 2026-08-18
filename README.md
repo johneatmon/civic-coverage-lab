@@ -557,6 +557,25 @@ sprawl case it degenerates.
 The report now computes all of these per city rather than printing Seattle's figures on
 every city's page, which is what it was doing.
 
+### The benchmark against random's distribution, not its mean
+
+Comparing a strategy to the mean of five random draws is weak. Against 30 draws:
+
+| | Seattle | Tacoma | Phoenix |
+|---|---:|---:|---:|
+| random: mean (sd) | 33,845 (7,057) | 21,918 (4,434) | 24,453 (5,743) |
+| PH by persistence | 25,037 — beats **16.7%** | 10,368 — **0.0%** | 12,462 — **0.0%** |
+| PH by population | 16,409 — **0.0%** | 22,563 — **63.3%** | 7,283 — **0.0%** |
+| MCLP greedy | 84,673 | 51,174 | 86,538 |
+
+Five of six PH results land below almost every random draw; the sixth sits mid-distribution,
+which is absence of signal rather than a win. MCLP falls outside the random range entirely
+in all three cities (Seattle's best of 30 random draws: +49,921 against MCLP's +84,673).
+
+The precise claim is therefore **"no topological variant is distinguishable from random
+placement, and most are worse"** — not "PH loses to random", which overstated a point
+estimate.
+
 ### Positioning
 
 UW's Taskar Center already does planner-facing pedestrian accessibility analysis —
